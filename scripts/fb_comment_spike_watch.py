@@ -2,8 +2,8 @@
 """
 FB Comment Spike Watch
 Sleduje příspěvky na FB stránce Respektu za posledních 7 dní a upozorňuje
-na Slacku, když příspěvku *přibude* za sledované okno (výchozí 4 hodiny)
-víc než daný počet komentářů (výchozí 100).
+na Slacku, když příspěvku *přibude* za sledované okno (výchozí 2 hodiny)
+víc než daný počet komentářů (výchozí 30).
 
 Hlídá se tedy rychlost přírůstku, ne absolutní počet: příspěvek, který
 nasbíral 300 komentářů rovnoměrně za týden, je nezajímavý; příspěvek,
@@ -19,11 +19,15 @@ Vyžaduje proměnné prostředí:
     SLACK_WEBHOOK_URL       - Incoming Webhook URL pro kanál
 
 Volitelné:
-    WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 4)
-    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 100)
+    WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 2)
+    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 30)
     COOLDOWN_HOURS          - jak dlouho po notifikaci mlčet u téhož
                               příspěvku (výchozí = WINDOW_HOURS)
     LOOKBACK_DAYS           - kolik dní zpět hledat příspěvky (výchozí 7)
+    QUIET_HOURS             - noční klid ve tvaru "22-7" (výchozí), prázdná
+                              hodnota = vypnuto. V klidu se dál měří, jen se
+                              nenotifikuje; ráno přijde souhrn.
+    TIMEZONE                - zóna pro noční klid (výchozí Europe/Prague)
     STATE_FILE              - cesta ke stavovému souboru
                               (výchozí state/fb_spike_state.json)
 """
@@ -36,6 +40,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zoneinfo
 
 GRAPH_API_VERSION = "v19.0"
 
@@ -140,6 +145,52 @@ def plural(n, one, few, many):
     return many
 
 
+def in_quiet_hours(now, tz_name, spec):
+    """Je teď noční klid? Spec má tvar "22-7" (od 22:00 do 6:59 místního času).
+
+    Prázdný spec = noční režim vypnutý.
+    """
+    if not spec or not spec.strip():
+        return False
+
+    try:
+        start_s, end_s = spec.split("-", 1)
+        start, end = int(start_s), int(end_s)
+    except ValueError:
+        print(f"Varování: QUIET_HOURS='{spec}' nejde přečíst, noční režim vypnut.", file=sys.stderr)
+        return False
+
+    try:
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        # Bez tzdat radši hlásit ve špatnou hodinu než mlčet celý den.
+        print(f"Varování: časovou zónu {tz_name} nelze načíst, používám UTC.", file=sys.stderr)
+        tz = datetime.timezone.utc
+
+    hour = datetime.datetime.fromtimestamp(now, tz).hour
+    if start == end:
+        return False
+    if start < end:
+        return start <= hour < end
+    # Interval přes půlnoc, např. 22-7.
+    return hour >= start or hour < end
+
+
+def send_night_summary(webhook_url, post, delta, comment_count, window_hours):
+    """Ráno po nočním klidu: co se v noci semlelo."""
+    message = post.get("message", "").strip()
+    snippet = (message[:120] + "…") if len(message) > 120 else message
+    hodiny = plural(window_hours, "hodinu", "hodiny", "hodin")
+    komentaru = plural(delta, "komentář", "komentáře", "komentářů")
+    text = (
+        f":crescent_moon: Přes noc u příspěvku přibylo až {delta} {komentaru} "
+        f"za {window_hours} {hodiny} (aktuálně {comment_count}).\n"
+        f"{snippet}\n"
+        f"{post.get('permalink_url', '')}"
+    )
+    return post_to_slack(webhook_url, text)
+
+
 def baseline_for(post, entry, now, window_seconds):
     """Kolik komentářů měl příspěvek na začátku okna a jak dlouhé měření je.
 
@@ -172,13 +223,18 @@ def send_slack_notification(webhook_url, post, delta, comment_count, window_hour
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
     hodiny = plural(window_hours, "hodinu", "hodiny", "hodin")
+    komentaru = plural(threshold, "komentář", "komentáře", "komentářů")
     text = (
         f":rotating_light: U příspěvku přibylo za poslední {window_hours} {hodiny} "
-        f"více než {threshold} komentářů (aktuálně {comment_count}, "
+        f"více než {threshold} {komentaru} (aktuálně {comment_count}, "
         f"přírůstek {delta}).\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
+    return post_to_slack(webhook_url, text)
+
+
+def post_to_slack(webhook_url, text):
     # Selhání Slacku nesmí shodit celý běh — jinak by se neuložil stav a
     # příště by se už odeslané notifikace poslaly znovu.
     try:
@@ -201,15 +257,18 @@ def main():
     page_id = env("FB_PAGE_ID", required=True)
     access_token = env("FB_PAGE_ACCESS_TOKEN", required=True)
     slack_webhook = env("SLACK_WEBHOOK_URL", required=True)
-    window_hours = int(env("WINDOW_HOURS", "4"))
-    threshold = int(env("DELTA_THRESHOLD", "100"))
+    window_hours = int(env("WINDOW_HOURS", "2"))
+    threshold = int(env("DELTA_THRESHOLD", "30"))
     cooldown_hours = int(env("COOLDOWN_HOURS", str(window_hours)))
     lookback_days = int(env("LOOKBACK_DAYS", "7"))
     state_file = env("STATE_FILE", "state/fb_spike_state.json")
+    quiet_spec = env("QUIET_HOURS", "22-7")
+    tz_name = env("TIMEZONE", "Europe/Prague")
 
     now = int(time.time())
     window_seconds = window_hours * 3600
     since_epoch = now - lookback_days * 86400
+    quiet = in_quiet_hours(now, tz_name, quiet_spec)
 
     posts = fetch_posts(page_id, access_token, since_epoch)
     state = load_state(state_file)
@@ -238,6 +297,26 @@ def main():
         cutoff = now - 2 * window_seconds
         entry["samples"] = [s for s in entry["samples"] if s[0] >= cutoff]
 
+        # Skončil noční klid a v noci se u tohohle příspěvku něco dělo →
+        # ráno se to ohlásí souhrnem. Spike z půl třetí v noci by jinak
+        # zmizel, protože do rána vypadne z okna.
+        if not quiet and "pending_delta" in entry:
+            ok = send_night_summary(
+                slack_webhook,
+                post,
+                entry["pending_delta"],
+                entry.get("pending_count", comment_count),
+                window_hours,
+            )
+            if ok:
+                entry.pop("pending_delta", None)
+                entry.pop("pending_count", None)
+                entry["last_alert_ts"] = now
+                sent += 1
+            else:
+                failed += 1
+            continue
+
         if base is None:
             continue
 
@@ -250,6 +329,13 @@ def main():
         # při každém běhu znovu.
         last_alert = entry.get("last_alert_ts", 0)
         if now - last_alert < cooldown_hours * 3600:
+            continue
+
+        if quiet:
+            # V noci se neruší, jen se zapamatuje nejsilnější přírůstek.
+            if delta > entry.get("pending_delta", 0):
+                entry["pending_delta"] = delta
+                entry["pending_count"] = comment_count
             continue
 
         ok = send_slack_notification(
@@ -271,6 +357,7 @@ def main():
     save_state(state_file, state)
     print(
         f"Zpracováno postů: {len(posts)}, odesláno notifikací: {sent}"
+        + (" (noční klid — notifikace odloženy na ráno)" if quiet else "")
         + (f", neodesláno (chyba Slacku): {failed}" if failed else "")
     )
 

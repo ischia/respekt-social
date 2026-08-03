@@ -2,8 +2,8 @@ name: FB Comment Spike Watch
 
 on:
   schedule:
-    # Každou hodinu. Měří se přírůstek za 4 hodiny, takže čím hustší
-    # vzorkování, tím přesnější základna a tím dřív se spike ozve.
+    # Každou hodinu. Přírůstek se měří ve WINDOW_HOURS okně, takže čím
+    # hustší vzorkování, tím přesnější základna a tím dřív se spike ozve.
     - cron: "0 * * * *"
   workflow_dispatch: {}  # umožní ruční spuštění z GitHub UI
 
@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repa
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Nastavit Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -27,6 +27,12 @@ jobs:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # Ladicí parametry — po týdnu provozu je vhodné je upravit
+          # podle toho, kolik notifikací reálně chodí.
+          WINDOW_HOURS: "2"       # v jak dlouhém okně se přírůstek měří
+          DELTA_THRESHOLD: "30"   # kolik komentářů v okně přibude = spike
+          QUIET_HOURS: "22-7"     # noční klid (prázdné = vypnuto)
+          TIMEZONE: "Europe/Prague"
         run: python scripts/fb_comment_spike_watch.py
 
       - name: Commitnout aktualizovaný stav
