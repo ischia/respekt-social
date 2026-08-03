@@ -1,0 +1,131 @@
+{
+  "name": "FB Comment Spike Watch",
+  "flow": [
+    {
+      "id": 1,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://graph.facebook.com/v19.0/{{PAGE_ID}}/posts?fields=id,message,created_time,permalink_url,comments.summary(true).limit(0)&since={{formatDate(addDays(now; -7); \"X\")}}&limit=100&access_token={{FB_PAGE_ACCESS_TOKEN}}",
+        "serializeUrl": false,
+        "method": "GET",
+        "headers": [],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": "",
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "followAllRedirects": false
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "label": "1. Načíst příspěvky za posledních 7 dní",
+        "parameters": [
+          { "name": "handleErrors", "type": "boolean", "label": "Evaluate all states as errors", "default": false },
+          { "name": "useNewZLibDeCompress", "type": "boolean", "label": "Use new ZLib DeCompress method", "default": true }
+        ],
+        "expect": [
+          { "name": "url", "type": "url", "label": "URL", "required": true },
+          { "name": "method", "type": "select", "label": "Method" }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{1.data}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "label": "2. Projít jednotlivé příspěvky"
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://hooks.slack.com/services/{{SLACK_WEBHOOK_PATH}}",
+        "serializeUrl": false,
+        "method": "POST",
+        "headers": [
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "data": "{\"text\": \":rotating_light: Příspěvek má přes 50 komentářů za posledních 7 dní: {{2.message}} ({{2.comments.summary.total_count}} komentářů) - {{2.permalink_url}}\"}",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": "",
+        "shareCookies": false,
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "followAllRedirects": false
+      },
+      "filter": {
+        "name": "Více než 50 komentářů",
+        "conditions": [
+          [
+            {
+              "a": "{{2.comments.summary.total_count}}",
+              "o": "number:greater",
+              "b": "50"
+            }
+          ]
+        ]
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "label": "3. Poslat Slack notifikaci (jen když > 50 komentářů)"
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "scheduling": {
+      "type": "interval",
+      "interval": 3600
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu2.make.com"
+  }
+}
