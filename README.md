@@ -36,6 +36,10 @@ přibylo 150 za dopoledne, je událost.
   se dál měří, ale nenotifikuje. Pokud v noci něco vyběhlo, přijde ráno
   souhrn („Přes noc u příspěvku přibylo až N komentářů"). Bez toho by
   spike ze druhé hodiny ranní do rána vypadl z okna a zmizel.
+- **Noční eskalace.** Opravdu velký nápor – ve výchozím nastavení 3×
+  práh, tedy 90 komentářů za 2 hodiny (`NIGHT_ESCALATION_FACTOR`) – se
+  ozve i v noci, protože pět hodin nemoderované diskuze napáchá víc škody
+  než jedno probuzení. `NIGHT_ESCALATION_FACTOR=0` to vypne úplně.
 - **Čerstvé příspěvky.** Příspěvek mladší než okno má základnu 0, protože
   všechny jeho komentáře nutně přibyly uvnitř okna. Ozve se tak i post,
   který explodoval hodinu po zveřejnění.
@@ -104,6 +108,7 @@ Volitelné proměnné prostředí:
 | `LOOKBACK_DAYS` | `7` | kolik dní zpět hledat příspěvky |
 | `QUIET_HOURS` | `22-7` | noční klid, prázdná hodnota = vypnuto |
 | `TIMEZONE` | `Europe/Prague` | zóna, podle které se počítá noční klid |
+| `NIGHT_ESCALATION_FACTOR` | `3` | kolikanásobek prahu probudí i v noci (0 = nikdy) |
 | `STATE_FILE` | `state/fb_spike_state.json` | cesta ke stavovému souboru |
 
 Nastavují se v workflow v sekci `env:` u kroku „Spustit sledování spiků".

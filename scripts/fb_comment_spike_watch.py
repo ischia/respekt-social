@@ -28,6 +28,8 @@ Volitelné:
                               hodnota = vypnuto. V klidu se dál měří, jen se
                               nenotifikuje; ráno přijde souhrn.
     TIMEZONE                - zóna pro noční klid (výchozí Europe/Prague)
+    NIGHT_ESCALATION_FACTOR - kolikanásobek prahu probudí i v noci
+                              (výchozí 3, hodnota 0 = nikdy nerušit)
     STATE_FILE              - cesta ke stavovému souboru
                               (výchozí state/fb_spike_state.json)
 """
@@ -176,6 +178,22 @@ def in_quiet_hours(now, tz_name, spec):
     return hour >= start or hour < end
 
 
+def send_night_escalation(webhook_url, post, delta, comment_count, window_hours):
+    """V noci se běžně mlčí, tohle je ale moc velké na to nechat běžet do rána."""
+    message = post.get("message", "").strip()
+    snippet = (message[:120] + "…") if len(message) > 120 else message
+    hodiny = plural(window_hours, "hodinu", "hodiny", "hodin")
+    komentaru = plural(delta, "komentář", "komentáře", "komentářů")
+    text = (
+        f":rotating_light: *I přes noční klid:* u příspěvku přibylo za "
+        f"poslední {window_hours} {hodiny} {delta} {komentaru} "
+        f"(aktuálně {comment_count}). Nejspíš to chce moderaci hned.\n"
+        f"{snippet}\n"
+        f"{post.get('permalink_url', '')}"
+    )
+    return post_to_slack(webhook_url, text)
+
+
 def send_night_summary(webhook_url, post, delta, comment_count, window_hours):
     """Ráno po nočním klidu: co se v noci semlelo."""
     message = post.get("message", "").strip()
@@ -264,6 +282,9 @@ def main():
     state_file = env("STATE_FILE", "state/fb_spike_state.json")
     quiet_spec = env("QUIET_HOURS", "22-7")
     tz_name = env("TIMEZONE", "Europe/Prague")
+    escalation_factor = float(env("NIGHT_ESCALATION_FACTOR", "3"))
+    # 0 = v noci nikdy nerušit, ani při sebevětším náporu.
+    escalation_at = threshold * escalation_factor if escalation_factor > 0 else None
 
     now = int(time.time())
     window_seconds = window_hours * 3600
@@ -332,7 +353,23 @@ def main():
             continue
 
         if quiet:
-            # V noci se neruší, jen se zapamatuje nejsilnější přírůstek.
+            # Opravdu velký nápor se ozve i v noci — pět hodin nemoderované
+            # diskuze je horší než jeden probuzený člověk.
+            if escalation_at and delta >= escalation_at:
+                ok = send_night_escalation(
+                    slack_webhook, post, delta, comment_count, window_hours
+                )
+                if ok:
+                    entry["last_alert_ts"] = now
+                    # Ráno už není co dohlašovat, tohle bylo ohlášeno hned.
+                    entry.pop("pending_delta", None)
+                    entry.pop("pending_count", None)
+                    sent += 1
+                else:
+                    failed += 1
+                continue
+
+            # Jinak se neruší, jen se zapamatuje nejsilnější přírůstek.
             if delta > entry.get("pending_delta", 0):
                 entry["pending_delta"] = delta
                 entry["pending_count"] = comment_count

@@ -325,3 +325,68 @@ assert sent == [], sent
 print("OK: příspěvek bez komentářů nehlásí")
 
 print("\nVšechny testy prošly.")
+
+# ==================== NOČNÍ ESKALACE ====================
+print("\n--- noční eskalace ---")
+
+# práh 100, faktor 3 -> eskalace od 300
+sent, state = run(
+    [post("A", 1450)],  # 1450-1100 = 350 >= 300
+    {"A": samples((6, 1000), (4, 1100), (2, 1200))},
+    **QUIET,
+)
+assert len(sent) == 1, sent
+assert "I přes noční klid" in sent[0], sent[0]
+assert "350 komentářů" in sent[0], sent[0]
+assert "pending_delta" not in state["A"], state
+assert state["A"]["last_alert_ts"] > 0
+print("OK: velký nápor probudí i v noci")
+print("   zpráva:", sent[0].split("\n")[0])
+
+# pod hranicí eskalace -> jen pending, ticho
+sent, state = run(
+    [post("A", 1350)],  # delta 250 < 300
+    {"A": samples((6, 1000), (4, 1100), (2, 1200))},
+    **QUIET,
+)
+assert sent == [], sent
+assert state["A"]["pending_delta"] == 250, state
+print("OK: pod hranicí eskalace se v noci mlčí")
+
+# faktor 0 = nikdy nerušit
+sent, state = run(
+    [post("A", 5000)],
+    {"A": samples((6, 1000), (4, 1100), (2, 1200))},
+    NIGHT_ESCALATION_FACTOR="0", **QUIET,
+)
+assert sent == [], sent
+assert state["A"]["pending_delta"] == 3900, state
+print("OK: faktor 0 nechá spát za každou cenu")
+
+# eskalace respektuje cooldown
+st = samples((6, 1000), (4, 1100), (2, 1200))
+st["last_alert_ts"] = NOW - 1 * H
+sent, _ = run([post("A", 1450)], {"A": st}, **QUIET)
+assert sent == [], sent
+print("OK: eskalace nepřebíjí cooldown")
+
+# selhání Slacku při eskalaci nenastaví cooldown
+sent, state = run(
+    [post("A", 1450)],
+    {"A": samples((6, 1000), (4, 1100), (2, 1200))},
+    slack_fails=True, **QUIET,
+)
+assert sent == [], sent
+assert "last_alert_ts" not in state["A"], state
+print("OK: selhání Slacku při eskalaci nezapíše cooldown")
+
+# ve dne se eskalace neuplatní, jde běžná notifikace
+sent, _ = run(
+    [post("A", 1450)],
+    {"A": samples((6, 1000), (4, 1100), (2, 1200))},
+    **DEN,
+)
+assert len(sent) == 1 and "I přes noční klid" not in sent[0], sent
+print("OK: ve dne chodí běžná notifikace")
+
+print("\nVšechny testy prošly.")

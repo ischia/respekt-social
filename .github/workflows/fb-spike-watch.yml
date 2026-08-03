@@ -33,6 +33,7 @@ jobs:
           DELTA_THRESHOLD: "30"   # kolik komentářů v okně přibude = spike
           QUIET_HOURS: "22-7"     # noční klid (prázdné = vypnuto)
           TIMEZONE: "Europe/Prague"
+          NIGHT_ESCALATION_FACTOR: "3"  # 3× práh probudí i v noci (0 = nikdy)
         run: python scripts/fb_comment_spike_watch.py
 
       - name: Commitnout aktualizovaný stav
