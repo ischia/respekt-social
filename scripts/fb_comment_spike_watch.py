@@ -112,16 +112,27 @@ def current_tier(comment_count, tier_size):
     return (comment_count // tier_size) * tier_size
 
 
-def send_slack_notification(webhook_url, post, tier, comment_count):
+def send_slack_notification(webhook_url, post, tier, comment_count, lookback_days):
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
     text = (
         f":rotating_light: Příspěvek překročil *{tier}* komentářů "
-        f"(aktuálně {comment_count}) za posledních 7 dní.\n"
+        f"(aktuálně {comment_count}) za posledních {lookback_days} dní.\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
-    status, body = http_post_json(webhook_url, {"text": text})
+    # Selhání Slacku nesmí shodit celý běh — jinak by se neuložil stav a
+    # příště by se už odeslané notifikace poslaly znovu.
+    try:
+        status, body = http_post_json(webhook_url, {"text": text})
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")
+        print(f"Slack webhook selhal ({e.code}): {detail}", file=sys.stderr)
+        return False
+    except urllib.error.URLError as e:
+        print(f"Slack webhook nedostupný: {e.reason}", file=sys.stderr)
+        return False
+
     if status != 200:
         print(f"Slack webhook vrátil status {status}: {body}", file=sys.stderr)
         return False
@@ -142,10 +153,13 @@ def main():
     state = load_state(state_file)
 
     sent = 0
+    failed = 0
+    seen_ids = set()
     for post in posts:
         post_id = post.get("id")
         if not post_id:
             continue
+        seen_ids.add(post_id)
 
         comment_count = (
             post.get("comments", {}).get("summary", {}).get("total_count", 0)
@@ -157,15 +171,27 @@ def main():
         last_tier = state.get(post_id, 0)
 
         if tier > last_tier:
-            ok = send_slack_notification(slack_webhook, post, tier, comment_count)
+            ok = send_slack_notification(
+                slack_webhook, post, tier, comment_count, lookback_days
+            )
             if ok:
                 state[post_id] = tier
                 sent += 1
+            else:
+                failed += 1
             # Pokud se odeslání nepovede, last_tier NEaktualizujeme —
             # příští běh to zkusí znovu, místo aby se spike tiše ztratil.
 
+    # Posty, které vypadly z okna, se už v odpovědi nikdy neobjeví; bez
+    # úklidu by stavový soubor rostl donekonečna.
+    for stale_id in set(state) - seen_ids:
+        del state[stale_id]
+
     save_state(state_file, state)
-    print(f"Zpracováno postů: {len(posts)}, odesláno notifikací: {sent}")
+    print(
+        f"Zpracováno postů: {len(posts)}, odesláno notifikací: {sent}"
+        + (f", neodesláno (chyba Slacku): {failed}" if failed else "")
+    )
 
 
 if __name__ == "__main__":
