@@ -2,10 +2,15 @@
 """
 FB Comment Spike Watch
 Sleduje příspěvky na FB stránce Respektu za posledních 7 dní a upozorňuje
-na Slacku, když příspěvek překročí další pásmo počtu komentářů (po 50).
+na Slacku, když příspěvku *přibude* za sledované okno (výchozí 4 hodiny)
+víc než daný počet komentářů (výchozí 100).
 
-Stav (nejvyšší nahlášené pásmo pro každý příspěvek) se ukládá do JSON
-souboru ve stejném repu, aby se notifikace neposílaly opakovaně.
+Hlídá se tedy rychlost přírůstku, ne absolutní počet: příspěvek, který
+nasbíral 300 komentářů rovnoměrně za týden, je nezajímavý; příspěvek,
+kterému jich přibylo 150 za dopoledne, je událost.
+
+Stav (naměřené počty komentářů v čase) se ukládá do JSON souboru ve stejném
+repu, aby šlo přírůstek mezi běhy vůbec spočítat.
 
 Vyžaduje proměnné prostředí:
     FB_PAGE_ID              - ID facebookové stránky
@@ -14,12 +19,16 @@ Vyžaduje proměnné prostředí:
     SLACK_WEBHOOK_URL       - Incoming Webhook URL pro kanál
 
 Volitelné:
-    TIER_SIZE               - velikost pásma v komentářích (výchozí 50)
+    WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 4)
+    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 100)
+    COOLDOWN_HOURS          - jak dlouho po notifikaci mlčet u téhož
+                              příspěvku (výchozí = WINDOW_HOURS)
     LOOKBACK_DAYS           - kolik dní zpět hledat příspěvky (výchozí 7)
     STATE_FILE              - cesta ke stavovému souboru
-                              (výchozí state/fb_spike_tiers.json)
+                              (výchozí state/fb_spike_state.json)
 """
 
+import datetime
 import json
 import os
 import sys
@@ -94,10 +103,15 @@ def load_state(path):
         return {}
     with open(path, "r", encoding="utf-8") as f:
         try:
-            return json.load(f)
+            state = json.load(f)
         except json.JSONDecodeError:
             print(f"Varování: {path} nejde přečíst jako JSON, začínám s prázdným stavem.", file=sys.stderr)
             return {}
+
+    # Starší verze skriptu ukládala jen číslo (dosažené pásmo po 50).
+    # Takový záznam nenese historii v čase a pro měření přírůstku je
+    # nepoužitelný — zahodíme ho a začneme u daného postu měřit znovu.
+    return {k: v for k, v in state.items() if isinstance(v, dict)}
 
 
 def save_state(path, state):
@@ -107,17 +121,61 @@ def save_state(path, state):
         f.write("\n")
 
 
-def current_tier(comment_count, tier_size):
-    """Nejvyšší dosažené pásmo. 0-49 -> 0 (žádný spike), 50-99 -> 50, atd."""
-    return (comment_count // tier_size) * tier_size
+def parse_created_time(value):
+    """Graph API vrací čas ve tvaru 2026-08-03T10:15:22+0000. Vrací epoch, nebo None."""
+    if not value:
+        return None
+    try:
+        return int(datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z").timestamp())
+    except (ValueError, TypeError):
+        return None
 
 
-def send_slack_notification(webhook_url, post, tier, comment_count, lookback_days):
+def plural(n, one, few, many):
+    """České skloňování podle počtu: 1 hodinu, 2-4 hodiny, 5+ hodin."""
+    if n == 1:
+        return one
+    if 2 <= n <= 4:
+        return few
+    return many
+
+
+def baseline_for(post, entry, now, window_seconds):
+    """Kolik komentářů měl příspěvek na začátku okna a jak dlouhé měření je.
+
+    Vrací (počet_komentářů, epoch_měření) nebo None, pokud zatím není z čeho
+    přírůstek počítat (post známe příliš krátce).
+    """
+    window_start = now - window_seconds
+
+    # Příspěvek vznikl až uvnitř okna → všechny jeho komentáře přibyly v okně.
+    created = parse_created_time(post.get("created_time"))
+    if created is not None and created >= window_start:
+        return 0, created
+
+    samples = entry.get("samples", [])
+    if not samples:
+        return None
+
+    # Nejnovější měření, které je ještě před začátkem okna = správná základna.
+    before = [s for s in samples if s[0] <= window_start]
+    if before:
+        return before[-1][1], before[-1][0]
+
+    # Okno zatím není celé pokryté (post sledujeme kratší dobu než window).
+    # Bereme nejstarší, co máme — přírůstek tak spíš podhodnotíme, což je
+    # bezpečnější než hlásit planý poplach.
+    return samples[0][1], samples[0][0]
+
+
+def send_slack_notification(webhook_url, post, delta, comment_count, window_hours, threshold):
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
+    hodiny = plural(window_hours, "hodinu", "hodiny", "hodin")
     text = (
-        f":rotating_light: Příspěvek překročil *{tier}* komentářů "
-        f"(aktuálně {comment_count}) za posledních {lookback_days} dní.\n"
+        f":rotating_light: U příspěvku přibylo za poslední {window_hours} {hodiny} "
+        f"více než {threshold} komentářů (aktuálně {comment_count}, "
+        f"přírůstek {delta}).\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
@@ -143,11 +201,15 @@ def main():
     page_id = env("FB_PAGE_ID", required=True)
     access_token = env("FB_PAGE_ACCESS_TOKEN", required=True)
     slack_webhook = env("SLACK_WEBHOOK_URL", required=True)
-    tier_size = int(env("TIER_SIZE", "50"))
+    window_hours = int(env("WINDOW_HOURS", "4"))
+    threshold = int(env("DELTA_THRESHOLD", "100"))
+    cooldown_hours = int(env("COOLDOWN_HOURS", str(window_hours)))
     lookback_days = int(env("LOOKBACK_DAYS", "7"))
-    state_file = env("STATE_FILE", "state/fb_spike_tiers.json")
+    state_file = env("STATE_FILE", "state/fb_spike_state.json")
 
-    since_epoch = int(time.time()) - lookback_days * 86400
+    now = int(time.time())
+    window_seconds = window_hours * 3600
+    since_epoch = now - lookback_days * 86400
 
     posts = fetch_posts(page_id, access_token, since_epoch)
     state = load_state(state_file)
@@ -164,26 +226,45 @@ def main():
         comment_count = (
             post.get("comments", {}).get("summary", {}).get("total_count", 0)
         )
-        tier = current_tier(comment_count, tier_size)
+        entry = state.setdefault(post_id, {"samples": []})
 
-        # Chybějící klíč = post ještě nikdy nesledovaný = pásmo 0.
-        # Žádný Aggregator, žádné hádání, jestli "záznam" existuje.
-        last_tier = state.get(post_id, 0)
+        base = baseline_for(post, entry, now, window_seconds)
 
-        if tier > last_tier:
-            ok = send_slack_notification(
-                slack_webhook, post, tier, comment_count, lookback_days
-            )
-            if ok:
-                state[post_id] = tier
-                sent += 1
-            else:
-                failed += 1
-            # Pokud se odeslání nepovede, last_tier NEaktualizujeme —
-            # příští běh to zkusí znovu, místo aby se spike tiše ztratil.
+        # Měření zapisujeme vždy, i když se zrovna nenotifikuje — jinak by
+        # nebylo z čeho počítat přírůstek při příštím běhu.
+        entry["samples"].append([now, comment_count])
+        # Držíme dvojnásobek okna, ať je vždy po ruce měření z doby *před*
+        # jeho začátkem, i když se běh jednou vynechá.
+        cutoff = now - 2 * window_seconds
+        entry["samples"] = [s for s in entry["samples"] if s[0] >= cutoff]
 
-    # Posty, které vypadly z okna, se už v odpovědi nikdy neobjeví; bez
-    # úklidu by stavový soubor rostl donekonečna.
+        if base is None:
+            continue
+
+        base_count, _base_ts = base
+        delta = comment_count - base_count
+        if delta <= threshold:
+            continue
+
+        # Prudká diskuze běží klidně půl dne; bez cooldownu by hlásila
+        # při každém běhu znovu.
+        last_alert = entry.get("last_alert_ts", 0)
+        if now - last_alert < cooldown_hours * 3600:
+            continue
+
+        ok = send_slack_notification(
+            slack_webhook, post, delta, comment_count, window_hours, threshold
+        )
+        if ok:
+            entry["last_alert_ts"] = now
+            sent += 1
+        else:
+            failed += 1
+        # Pokud se odeslání nepovede, last_alert_ts NEnastavujeme —
+        # příští běh to zkusí znovu, místo aby se spike tiše ztratil.
+
+    # Posty, které vypadly ze sledovaného okna, se už v odpovědi neobjeví;
+    # bez úklidu by stavový soubor rostl donekonečna.
     for stale_id in set(state) - seen_ids:
         del state[stale_id]
 

@@ -1,28 +1,46 @@
 # respekt-social
 
 Sledování facebookové stránky Respektu – hlídá příspěvky za posledních 7 dní
-a hlásí na Slack, když příspěvek překročí další pásmo počtu komentářů.
+a hlásí na Slack, když některému **prudce přibývají komentáře**.
+
+Zpráva vypadá takhle:
+
+> :rotating_light: U příspěvku přibylo za poslední 4 hodiny více než 100
+> komentářů (aktuálně 1251, přírůstek 151).
 
 ## Jak to funguje
 
-`scripts/fb_comment_spike_watch.py` běží přes GitHub Actions každé 2 hodiny:
+`scripts/fb_comment_spike_watch.py` běží přes GitHub Actions každou hodinu:
 
 1. Stáhne z Graph API příspěvky stránky za posledních 7 dní i s počtem
    komentářů (`comments.summary(true)`).
-2. Pro každý příspěvek spočítá **pásmo** = počet komentářů zaokrouhlený dolů
-   na násobek 50 (0–49 → 0, 50–99 → 50, 100–149 → 100, …).
-3. Porovná s nejvyšším už nahlášeným pásmem uloženým v
-   `state/fb_spike_tiers.json`. Je-li aktuální pásmo vyšší, pošle Slack
-   notifikaci a nové pásmo si zapíše.
-4. Workflow commitne aktualizovaný stav zpátky do repa.
+2. Aktuální počet zapíše do časové řady ve `state/fb_spike_state.json`.
+3. Spočítá **přírůstek za okno**: aktuální počet minus počet naměřený na
+   začátku okna (výchozí 4 hodiny zpět).
+4. Když přírůstek překročí práh (výchozí 100), pošle notifikaci na Slack.
+5. Workflow commitne aktualizovaný stav zpátky do repa.
 
-Díky pásmům se u jednoho příspěvku neposílá pořád dokola totéž: první
-notifikace přijde při 50 komentářích, další až při 100, pak při 150 atd.
-Pokud odeslání na Slack selže, stav se pro daný příspěvek **neuloží** a
-příští běh se o notifikaci pokusí znovu.
+Sleduje se tedy **rychlost**, ne absolutní počet: příspěvek, který nasbíral
+300 komentářů rovnoměrně za týden, je nezajímavý; příspěvek, kterému jich
+přibylo 150 za dopoledne, je událost.
 
-Příspěvky, které vypadnou ze 7denního okna, se ze stavového souboru
-automaticky odstraní, aby nerostl donekonečna.
+### Detaily chování
+
+- **Základnou je začátek okna, ne poslední běh.** Při hodinovém běhu a
+  4hodinovém okně se porovnává se stavem před 4 hodinami – spike se pozná,
+  i když roste plynule (např. +40 každou hodinu).
+- **Čerstvé příspěvky.** Příspěvek mladší než okno má základnu 0, protože
+  všechny jeho komentáře nutně přibyly uvnitř okna. Ozve se tak i post,
+  který explodoval hodinu po zveřejnění.
+- **První pozorování staršího příspěvku nehlásí** – není z čeho přírůstek
+  počítat. Ozve se až při dalším běhu.
+- **Cooldown.** Po notifikaci se u téhož příspěvku mlčí po dobu
+  `COOLDOWN_HOURS` (výchozí = délka okna), aby jedna vášnivá diskuze
+  nehlásila každou hodinu.
+- **Selhání Slacku** neshodí běh a nezapíše cooldown – příští běh to zkusí
+  znovu, místo aby se spike tiše ztratil.
+- **Úklid.** Příspěvky, které vypadnou ze 7denního okna, se ze stavového
+  souboru odstraní; historie měření se u každého drží jen na 2× délku okna.
 
 ## Nastavení
 
@@ -73,17 +91,21 @@ Volitelné proměnné prostředí:
 
 | Proměnná | Výchozí | Popis |
 |---|---|---|
-| `TIER_SIZE` | `50` | velikost pásma v komentářích |
+| `WINDOW_HOURS` | `4` | délka okna pro měření přírůstku |
+| `DELTA_THRESHOLD` | `100` | kolik komentářů musí v okně přibýt |
+| `COOLDOWN_HOURS` | = `WINDOW_HOURS` | jak dlouho po notifikaci mlčet u téhož příspěvku |
 | `LOOKBACK_DAYS` | `7` | kolik dní zpět hledat příspěvky |
-| `STATE_FILE` | `state/fb_spike_tiers.json` | cesta ke stavovému souboru |
+| `STATE_FILE` | `state/fb_spike_state.json` | cesta ke stavovému souboru |
 
-## Co dál (v2)
+Nastavují se v workflow v sekci `env:` u kroku „Spustit sledování spiků".
 
-Současná verze hlásí **absolutní** počet komentářů. Zamýšlené rozšíření je
-detekce podle **rychlosti přírůstku** v časovém intervalu (např. odchylka
-oproti obvyklému tempu stránky), aby se ozval i příspěvek, který nabírá
-komentáře nezvykle rychle, ale absolutně jich má zatím málo. K tomu bude
-potřeba ukládat i časovou řadu, ne jen poslední pásmo.
+## Co dál
+
+Práh je zatím **absolutní číslo** (100 komentářů za 4 hodiny) stejné pro
+všechny příspěvky. Další krok je práh **relativní k obvyklému tempu
+stránky** – tedy hlásit, když příspěvek roste nezvykle rychle *vzhledem
+k tomu, co je na téhle stránce běžné* (např. odchylka od mediánu
+přírůstků). Data na to už se sbírají, stav drží časovou řadu.
 
 ## Složka `make/`
 
