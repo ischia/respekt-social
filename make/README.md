@@ -42,16 +42,22 @@ Scheduling (ikona hodin dole vlevo): **Every 30 minutes**.
 
 Ulož a zapni scénář (toggle vpravo nahoře).
 
-### Pozor na limit operací
+### Spotřeba kreditů
 
-Free tier Make má 1000 operací měsíčně. Při spouštění po 30 minutách je to
-~1440 — limit by došel kolem 20. dne. Možnosti:
+Účet Respekt Media má 10 000 kreditů měsíčně a dosavadní provoz spotřebuje
+v průměru 181 denně (~5 400 měsíčně). Jeden HTTP modul = 1 kredit za
+spuštění:
 
-- interval **45 minut** (~960/měsíc) se do free tieru vejde
-- nebo nejnižší placený plán a interval 20–30 minut
+| Interval | Denně | Měsíčně | Celkem i s dosavadním provozem |
+|---|---|---|---|
+| 30 min | 48 | 1 440 | ~6 900 (69 %) |
+| 20 min | 72 | 2 160 | ~7 600 (76 %) |
+| 15 min | 96 | 2 880 | ~8 300 (83 %) |
 
-Kratší interval = dřívější detekce, ale rozdíl mezi 30 a 45 minutami je
-u dvouhodinového okna malý.
+**30 minut** dává při dvouhodinovém okně čtyři měření na okno, což na
+spolehlivou základnu stačí, a nechává skoro třetinu rozpočtu jako rezervu.
+20 minut se taky vejde. Pod 15 minut nemá smysl chodit — přínos je malý
+a rezerva mizí.
 
 ## 3. Ověření
 
