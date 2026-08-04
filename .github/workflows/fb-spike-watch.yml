@@ -2,9 +2,12 @@ name: FB Comment Spike Watch
 
 on:
   schedule:
-    # Každou hodinu. Přírůstek se měří ve WINDOW_HOURS okně, takže čím
-    # hustší vzorkování, tím přesnější základna a tím dřív se spike ozve.
-    - cron: "0 * * * *"
+    # Dvakrát za hodinu a záměrně mimo celou hodinu: GitHub scheduled
+    # workflows se pod zátěží opožďují i o hodiny a běhy tiše zahazuje,
+    # nejvíc právě v minutě 0, kdy se spouští půlka světa. Reálné rozestupy
+    # tak vycházely 2-4 hodiny místo jedné, což při dvouhodinovém okně
+    # detekci rozbíjí. Víc pokusů = víc skutečně proběhlých běhů.
+    - cron: "13,43 * * * *"
   workflow_dispatch: {}  # umožní ruční spuštění z GitHub UI
 
 permissions:

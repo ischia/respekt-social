@@ -105,7 +105,7 @@ sent, state = run(
 )
 assert len(sent) == 1, sent
 assert "za poslední 4 hodiny" in sent[0], sent[0]
-assert "více než 100 komentářů" in sent[0], sent[0]
+assert "151 komentářů" in sent[0], sent[0]
 assert "aktuálně 1251" in sent[0], sent[0]
 assert state["A"]["last_alert_ts"] > 0
 assert "last_alert_ts" not in state["B"]
@@ -127,10 +127,10 @@ assert len(sent) == 1, sent
 assert "aktuálně 150" in sent[0]
 print("OK: čerstvý příspěvek hlásí i bez historie")
 
-# nový, ale pod prahem
-sent, _ = run([post("NEW", 80, age_hours=1)], {})
+# nový a pomalý: za hodinu 40 komentářů, poměrný práh je 50 -> ticho
+sent, _ = run([post("NEW", 40, age_hours=1)], {})
 assert sent == [], sent
-print("OK: čerstvý příspěvek pod prahem mlčí")
+print("OK: čerstvý příspěvek pod poměrným prahem mlčí")
 
 # --- 4. poprvé viděný starý příspěvek nehlásí (není z čeho počítat) ---
 sent, state = run([post("OLD", 5000, age_hours=72)], {})
@@ -158,12 +158,12 @@ sent, _ = run(
     DELTA_THRESHOLD="50",
 )
 assert len(sent) == 1, sent
-assert "za poslední 2 hodiny" in sent[0] and "více než 50" in sent[0], sent[0]
+assert "za poslední 2 hodiny" in sent[0] and "60 komentářů" in sent[0], sent[0]
 print("OK: WINDOW_HOURS + DELTA_THRESHOLD")
 
 sent, _ = run([post("A", 200, age_hours=1)], {}, WINDOW_HOURS="1", DELTA_THRESHOLD="99")
-assert "za poslední 1 hodinu" in sent[0], sent[0]
-print("OK: skloňování v reálné zprávě")
+assert "za posledních 60 minut" in sent[0], sent[0]
+print("OK: kratší měření se hlásí v minutách")
 
 # --- 7. migrace ze starého formátu stavu (číslo -> dict) ---
 sent, state = run([post("A", 300)], {"A": 250})
@@ -302,7 +302,7 @@ sent, _ = run(
 )
 assert len(sent) == 1, sent
 assert "za poslední 2 hodiny" in sent[0], sent[0]
-assert "více než 30 komentářů" in sent[0], sent[0]
+assert "35 komentářů" in sent[0], sent[0]
 print("OK: výchozí 2h/30 hlásí")
 print("   zpráva:", sent[0].split("\n")[0])
 
@@ -388,5 +388,62 @@ sent, _ = run(
 )
 assert len(sent) == 1 and "I přes noční klid" not in sent[0], sent
 print("OK: ve dne chodí běžná notifikace")
+
+print("\nVšechny testy prošly.")
+
+# ==================== POMĚRNÝ PRÁH U KRÁTKÉHO MĚŘENÍ ====================
+print("\n--- poměrný práh ---")
+
+W = 2 * H  # okno 2 hodiny
+
+# plné okno = plný práh
+assert watch.required_delta(30, W, W) == 30
+assert watch.required_delta(30, 5 * H, W) == 30
+# poloviční okno = poloviční práh
+assert watch.required_delta(30, H, W) == 15
+# velmi krátké měření nespadne pod polovinu prahu
+assert watch.required_delta(30, 60, W) == 15
+assert watch.required_delta(100, 60, 4 * H) == 50
+print("OK: výpočet poměrného prahu")
+
+# --- reálný případ: příspěvek z 8:25, běh v 9:42 (1h17m), 28 komentářů ---
+# poměrný práh = 30 * (77/120) = 19.25 -> 28 to překročí
+sent, _ = run(
+    [post("CEUTA", 28, age_hours=77 / 60)],
+    {},
+    defaults=True, QUIET_HOURS="",
+)
+assert len(sent) == 1, sent
+assert "28 komentářů" in sent[0], sent[0]
+print("OK: reálný propadlý případ (28 komentářů za 1h17m) se nově zachytí")
+print("   zpráva:", sent[0].split("\n")[0])
+
+# --- ale pomalý rozjezd ve stejném věku ne ---
+# 15 komentářů za 1h17m: pod poměrným prahem 19.25
+sent, _ = run(
+    [post("POMALY", 15, age_hours=77 / 60)],
+    {},
+    defaults=True, QUIET_HOURS="",
+)
+assert sent == [], sent
+print("OK: pomalý rozjezd ve stejném věku mlčí")
+
+# --- podlaha: pár komentářů hned po zveřejnění nedělá poplach ---
+# 10 komentářů za 3 minuty, podlaha je 15
+sent, _ = run(
+    [post("CERSTVY", 10, age_hours=3 / 60)],
+    {},
+    defaults=True, QUIET_HOURS="",
+)
+assert sent == [], sent
+print("OK: podlaha drží pár komentářů hned po vydání pod prahem")
+
+# --- formulace času ---
+assert watch.format_span(60) == "poslední 1 minutu", watch.format_span(60)
+assert watch.format_span(3 * 60) == "poslední 3 minuty"
+assert watch.format_span(28 * 60) == "posledních 28 minut"
+assert watch.format_span(2 * H) == "poslední 2 hodiny"
+assert watch.format_span(5 * H) == "posledních 5 hodin"
+print("OK: skloňování délky měření")
 
 print("\nVšechny testy prošly.")

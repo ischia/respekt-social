@@ -147,6 +147,34 @@ def plural(n, one, few, many):
     return many
 
 
+def format_span(seconds):
+    """Délka měření i se shodným přívlastkem: "poslední 2 hodiny",
+    "posledních 28 minut". U 5 a víc se mění i tvar "poslední"."""
+    minutes = max(1, round(seconds / 60))
+    if minutes < 90:
+        n, jednotka = minutes, plural(minutes, "minutu", "minuty", "minut")
+    else:
+        n = round(seconds / 3600)
+        jednotka = plural(n, "hodinu", "hodiny", "hodin")
+    posledni = plural(n, "poslední", "poslední", "posledních")
+    return f"{posledni} {n} {jednotka}"
+
+
+def required_delta(threshold, elapsed_seconds, window_seconds):
+    """Kolik komentářů musí přibýt, aby to byl spike.
+
+    U příspěvku, který sledujeme kratší dobu než celé okno, se práh poměrně
+    zkrátí — jinak by čerstvý příspěvek s prudkým náběhem propadl jen proto,
+    že ještě nestihl nasbírat počet odpovídající plnému oknu. Zároveň
+    neklesne pod polovinu prahu, aby pár komentářů během chvilky nedělalo
+    poplach.
+    """
+    if elapsed_seconds >= window_seconds:
+        return threshold
+    prorated = threshold * elapsed_seconds / window_seconds
+    return max(prorated, threshold / 2)
+
+
 def in_quiet_hours(now, tz_name, spec):
     """Je teď noční klid? Spec má tvar "22-7" (od 22:00 do 6:59 místního času).
 
@@ -178,15 +206,14 @@ def in_quiet_hours(now, tz_name, spec):
     return hour >= start or hour < end
 
 
-def send_night_escalation(webhook_url, post, delta, comment_count, window_hours):
+def send_night_escalation(webhook_url, post, delta, comment_count, elapsed):
     """V noci se běžně mlčí, tohle je ale moc velké na to nechat běžet do rána."""
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
-    hodiny = plural(window_hours, "hodinu", "hodiny", "hodin")
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
     text = (
         f":rotating_light: *I přes noční klid:* u příspěvku přibylo za "
-        f"poslední {window_hours} {hodiny} {delta} {komentaru} "
+        f"{format_span(elapsed)} {delta} {komentaru} "
         f"(aktuálně {comment_count}). Nejspíš to chce moderaci hned.\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
@@ -194,15 +221,14 @@ def send_night_escalation(webhook_url, post, delta, comment_count, window_hours)
     return post_to_slack(webhook_url, text)
 
 
-def send_night_summary(webhook_url, post, delta, comment_count, window_hours):
+def send_night_summary(webhook_url, post, delta, comment_count, elapsed):
     """Ráno po nočním klidu: co se v noci semlelo."""
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
-    hodiny = plural(window_hours, "hodinu", "hodiny", "hodin")
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
     text = (
         f":crescent_moon: Přes noc u příspěvku přibylo až {delta} {komentaru} "
-        f"za {window_hours} {hodiny} (aktuálně {comment_count}).\n"
+        f"za {format_span(elapsed)} (aktuálně {comment_count}).\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
@@ -237,15 +263,13 @@ def baseline_for(post, entry, now, window_seconds):
     return samples[0][1], samples[0][0]
 
 
-def send_slack_notification(webhook_url, post, delta, comment_count, window_hours, threshold):
+def send_slack_notification(webhook_url, post, delta, comment_count, elapsed):
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
-    hodiny = plural(window_hours, "hodinu", "hodiny", "hodin")
-    komentaru = plural(threshold, "komentář", "komentáře", "komentářů")
+    komentaru = plural(delta, "komentář", "komentáře", "komentářů")
     text = (
-        f":rotating_light: U příspěvku přibylo za poslední {window_hours} {hodiny} "
-        f"více než {threshold} {komentaru} (aktuálně {comment_count}, "
-        f"přírůstek {delta}).\n"
+        f":rotating_light: U příspěvku přibylo za {format_span(elapsed)} "
+        f"{delta} {komentaru} (aktuálně {comment_count}).\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
@@ -327,11 +351,12 @@ def main():
                 post,
                 entry["pending_delta"],
                 entry.get("pending_count", comment_count),
-                window_hours,
+                entry.get("pending_elapsed", window_seconds),
             )
             if ok:
                 entry.pop("pending_delta", None)
                 entry.pop("pending_count", None)
+                entry.pop("pending_elapsed", None)
                 entry["last_alert_ts"] = now
                 sent += 1
             else:
@@ -341,9 +366,10 @@ def main():
         if base is None:
             continue
 
-        base_count, _base_ts = base
+        base_count, base_ts = base
         delta = comment_count - base_count
-        if delta <= threshold:
+        elapsed = max(now - base_ts, 60)
+        if delta <= required_delta(threshold, elapsed, window_seconds):
             continue
 
         # Prudká diskuze běží klidně půl dne; bez cooldownu by hlásila
@@ -357,13 +383,14 @@ def main():
             # diskuze je horší než jeden probuzený člověk.
             if escalation_at and delta >= escalation_at:
                 ok = send_night_escalation(
-                    slack_webhook, post, delta, comment_count, window_hours
+                    slack_webhook, post, delta, comment_count, elapsed
                 )
                 if ok:
                     entry["last_alert_ts"] = now
                     # Ráno už není co dohlašovat, tohle bylo ohlášeno hned.
                     entry.pop("pending_delta", None)
                     entry.pop("pending_count", None)
+                    entry.pop("pending_elapsed", None)
                     sent += 1
                 else:
                     failed += 1
@@ -373,10 +400,11 @@ def main():
             if delta > entry.get("pending_delta", 0):
                 entry["pending_delta"] = delta
                 entry["pending_count"] = comment_count
+                entry["pending_elapsed"] = elapsed
             continue
 
         ok = send_slack_notification(
-            slack_webhook, post, delta, comment_count, window_hours, threshold
+            slack_webhook, post, delta, comment_count, elapsed
         )
         if ok:
             entry["last_alert_ts"] = now

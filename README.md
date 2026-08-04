@@ -13,7 +13,8 @@ včas na to, aby se stihly moderovat.
 
 ## Jak to funguje
 
-`scripts/fb_comment_spike_watch.py` běží přes GitHub Actions každou hodinu:
+`scripts/fb_comment_spike_watch.py` běží přes GitHub Actions dvakrát za
+hodinu (v minutách 13 a 43):
 
 1. Stáhne z Graph API příspěvky stránky za posledních 7 dní i s počtem
    komentářů (`comments.summary(true)`).
@@ -43,6 +44,12 @@ přibylo 150 za dopoledne, je událost.
 - **Čerstvé příspěvky.** Příspěvek mladší než okno má základnu 0, protože
   všechny jeho komentáře nutně přibyly uvnitř okna. Ozve se tak i post,
   který explodoval hodinu po zveřejnění.
+- **Poměrný práh u kratšího měření.** Když je měření kratší než celé okno
+  (čerstvý příspěvek), zkrátí se poměrně i práh: za hodinu při okně 2 h
+  stačí polovina. Jinak by prudce startující příspěvek propadl jen proto,
+  že ještě nestihl nasbírat počet odpovídající plnému oknu — přesně to,
+  co je u moderace potřeba chytit nejdřív. Práh přitom nikdy neklesne pod
+  polovinu, aby pár komentářů pár minut po vydání nedělalo poplach.
 - **První pozorování staršího příspěvku nehlásí** – není z čeho přírůstek
   počítat. Ozve se až při dalším běhu.
 - **Cooldown.** Po notifikaci se u téhož příspěvku mlčí po dobu
@@ -124,6 +131,18 @@ běží půl dne.
 
 Po týdnu provozu je vhodné čísla doladit podle toho, kolik notifikací
 reálně chodí.
+
+### Spolehlivost cronu
+
+GitHub scheduled workflows nejsou přesné. V ostrém provozu vycházely
+rozestupy mezi běhy **2 až 4 hodiny** místo požadované jedné — runnery pod
+zátěží běhy tiše zahazují, nejvíc v minutě 0, kdy startuje půlka světa.
+Proto cron míří na minuty 13 a 43: mimo špičku a dvakrát za hodinu, aby
+zahozený běh tolik nevadil.
+
+Pokud by rozestupy zůstaly příliš velké, jediné spolehlivé řešení je
+spouštět to mimo GitHub Actions (vlastní cron, cloud scheduler) a workflow
+nechat jen jako zálohu.
 
 ## Co dál
 
