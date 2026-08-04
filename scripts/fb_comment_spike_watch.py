@@ -3,7 +3,7 @@
 FB Comment Spike Watch
 Sleduje příspěvky na FB stránce Respektu za posledních 7 dní a upozorňuje
 na Slacku, když příspěvku *přibude* za sledované okno (výchozí 2 hodiny)
-víc než daný počet komentářů (výchozí 30).
+víc než daný počet komentářů (výchozí 45).
 
 Hlídá se tedy rychlost přírůstku, ne absolutní počet: příspěvek, který
 nasbíral 300 komentářů rovnoměrně za týden, je nezajímavý; příspěvek,
@@ -20,7 +20,10 @@ Vyžaduje proměnné prostředí:
 
 Volitelné:
     WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 2)
-    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 30)
+    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 45)
+    COMMENT_FILTER          - "stream" (výchozí) počítá i odpovědi ve
+                              vláknech, takže čísla sedí s Facebookem;
+                              "toplevel" jen komentáře první úrovně
     COOLDOWN_HOURS          - jak dlouho po notifikaci mlčet u téhož
                               příspěvku (výchozí = WINDOW_HOURS)
     LOOKBACK_DAYS           - kolik dní zpět hledat příspěvky (výchozí 7)
@@ -45,6 +48,8 @@ import urllib.request
 import zoneinfo
 
 GRAPH_API_VERSION = "v19.0"
+# Klíč ve stavu, pod kterým se drží metadata běhu (ne příspěvek).
+META_KEY = "_meta"
 
 
 def env(name, default=None, required=False):
@@ -73,14 +78,21 @@ def http_post_json(url, payload):
         return resp.status, resp.read().decode("utf-8")
 
 
-def fetch_posts(page_id, access_token, since_epoch, limit=100):
+def fetch_posts(page_id, access_token, since_epoch, comment_filter="stream", limit=100):
     """Stáhne posty stránky za posledních N dní, s počtem komentářů.
+
+    comment_filter="stream" počítá i odpovědi ve vláknech, takže číslo sedí
+    s tím, co je vidět na Facebooku; "toplevel" počítá jen komentáře první
+    úrovně (to je výchozí chování Graph API a vychází zhruba o třetinu níž).
 
     Facebook Graph API vrací výsledky obalené v {"data": [...], "paging": {...}}.
     """
     base = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{page_id}/posts"
     params = {
-        "fields": "id,message,created_time,permalink_url,comments.summary(true).limit(0)",
+        "fields": (
+            "id,message,created_time,permalink_url,"
+            f"comments.summary(true).filter({comment_filter}).limit(0)"
+        ),
         "since": str(since_epoch),
         "limit": str(limit),
         "access_token": access_token,
@@ -105,7 +117,7 @@ def fetch_posts(page_id, access_token, since_epoch, limit=100):
     return posts
 
 
-def load_state(path):
+def load_state(path, comment_filter):
     if not os.path.exists(path):
         return {}
     with open(path, "r", encoding="utf-8") as f:
@@ -115,16 +127,34 @@ def load_state(path):
             print(f"Varování: {path} nejde přečíst jako JSON, začínám s prázdným stavem.", file=sys.stderr)
             return {}
 
+    # Změna způsobu počítání komentářů posune všechna čísla naráz (stream
+    # počítá i odpovědi, toplevel ne). Porovnávat nové počty se starou
+    # základnou by udělalo spike ze všech sledovaných příspěvků najednou,
+    # takže historii radši zahodíme a začneme měřit znovu.
+    stored = state.get(META_KEY, {}).get("filter")
+    if stored != comment_filter:
+        if stored is not None:
+            print(
+                f"Způsob počítání komentářů se změnil ({stored} -> {comment_filter}), "
+                "historie se zahazuje a měření začíná znovu.",
+                file=sys.stderr,
+            )
+        return {}
+
     # Starší verze skriptu ukládala jen číslo (dosažené pásmo po 50).
     # Takový záznam nenese historii v čase a pro měření přírůstku je
     # nepoužitelný — zahodíme ho a začneme u daného postu měřit znovu.
-    return {k: v for k, v in state.items() if isinstance(v, dict)}
+    return {
+        k: v for k, v in state.items() if k != META_KEY and isinstance(v, dict)
+    }
 
 
-def save_state(path, state):
+def save_state(path, state, comment_filter):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    payload = dict(state)
+    payload[META_KEY] = {"filter": comment_filter}
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2, sort_keys=True)
+        json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
         f.write("\n")
 
 
@@ -300,10 +330,11 @@ def main():
     access_token = env("FB_PAGE_ACCESS_TOKEN", required=True)
     slack_webhook = env("SLACK_WEBHOOK_URL", required=True)
     window_hours = int(env("WINDOW_HOURS", "2"))
-    threshold = int(env("DELTA_THRESHOLD", "30"))
+    threshold = int(env("DELTA_THRESHOLD", "45"))
     cooldown_hours = int(env("COOLDOWN_HOURS", str(window_hours)))
     lookback_days = int(env("LOOKBACK_DAYS", "7"))
     state_file = env("STATE_FILE", "state/fb_spike_state.json")
+    comment_filter = env("COMMENT_FILTER", "stream")
     quiet_spec = env("QUIET_HOURS", "22-7")
     tz_name = env("TIMEZONE", "Europe/Prague")
     escalation_factor = float(env("NIGHT_ESCALATION_FACTOR", "3"))
@@ -315,8 +346,8 @@ def main():
     since_epoch = now - lookback_days * 86400
     quiet = in_quiet_hours(now, tz_name, quiet_spec)
 
-    posts = fetch_posts(page_id, access_token, since_epoch)
-    state = load_state(state_file)
+    posts = fetch_posts(page_id, access_token, since_epoch, comment_filter)
+    state = load_state(state_file, comment_filter)
 
     sent = 0
     failed = 0
@@ -419,7 +450,7 @@ def main():
     for stale_id in set(state) - seen_ids:
         del state[stale_id]
 
-    save_state(state_file, state)
+    save_state(state_file, state, comment_filter)
     print(
         f"Zpracováno postů: {len(posts)}, odesláno notifikací: {sent}"
         + (" (noční klid — notifikace odloženy na ráno)" if quiet else "")

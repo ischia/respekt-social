@@ -33,7 +33,8 @@ jobs:
           # Ladicí parametry — po týdnu provozu je vhodné je upravit
           # podle toho, kolik notifikací reálně chodí.
           WINDOW_HOURS: "2"       # v jak dlouhém okně se přírůstek měří
-          DELTA_THRESHOLD: "30"   # kolik komentářů v okně přibude = spike
+          DELTA_THRESHOLD: "45"   # kolik komentářů v okně přibude = spike
+          COMMENT_FILTER: "stream"      # počítat i odpovědi ve vláknech
           QUIET_HOURS: "22-7"     # noční klid (prázdné = vypnuto)
           TIMEZONE: "Europe/Prague"
           NIGHT_ESCALATION_FACTOR: "3"  # 3× práh probudí i v noci (0 = nikdy)

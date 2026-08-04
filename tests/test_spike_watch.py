@@ -47,6 +47,8 @@ def run(posts, state, slack_fails=False, defaults=False, **env):
     # změna výchozích hodnot skriptu nerozbila jejich očekávání.
     if not defaults:
         env = {"WINDOW_HOURS": "4", "DELTA_THRESHOLD": "100", **env}
+    state = dict(state)
+    state.setdefault("_meta", {"filter": "stream"})
     sent = []
     watch.fetch_posts = lambda *a, **k: posts
 
@@ -76,6 +78,7 @@ def run(posts, state, slack_fails=False, defaults=False, **env):
     with open(path) as f:
         new_state = json.load(f)
     os.unlink(path)
+    new_state.pop("_meta", None)
     return sent, new_state
 
 
@@ -291,29 +294,29 @@ print("OK: v noci se dál vzorkuje")
 
 print("\nVšechny testy prošly.")
 
-# ==================== VÝCHOZÍ HODNOTY (2h / 30) ====================
+# ==================== VÝCHOZÍ HODNOTY (2h / 45) ====================
 print("\n--- výchozí hodnoty ---")
 
-# 35 komentářů za 2h -> hlásit
+# 55 komentářů za 2h -> hlásit
 sent, _ = run(
-    [post("A", 35)],
+    [post("A", 55)],
     {"A": samples((3, 0), (2, 0), (1, 12))},
     defaults=True, QUIET_HOURS="",
 )
 assert len(sent) == 1, sent
 assert "za poslední 2 hodiny" in sent[0], sent[0]
-assert "35 komentářů" in sent[0], sent[0]
-print("OK: výchozí 2h/30 hlásí")
+assert "55 komentářů" in sent[0], sent[0]
+print("OK: výchozí 2h/45 hlásí")
 print("   zpráva:", sent[0].split("\n")[0])
 
-# 25 za 2h -> ticho
+# 40 za 2h -> ticho
 sent, _ = run(
-    [post("B", 25)],
+    [post("B", 40)],
     {"B": samples((3, 0), (2, 0), (1, 10))},
     defaults=True, QUIET_HOURS="",
 )
 assert sent == [], sent
-print("OK: výchozí 2h/30 pod prahem mlčí")
+print("OK: výchozí 2h/45 pod prahem mlčí")
 
 # typický mrtvý příspěvek (90 % případů) nikdy nehlásí
 sent, state = run(
@@ -406,22 +409,22 @@ assert watch.required_delta(30, 60, W) == 15
 assert watch.required_delta(100, 60, 4 * H) == 50
 print("OK: výpočet poměrného prahu")
 
-# --- reálný případ: příspěvek z 8:25, běh v 9:42 (1h17m), 28 komentářů ---
-# poměrný práh = 30 * (77/120) = 19.25 -> 28 to překročí
+# --- reálný případ: příspěvek z 8:25, běh v 9:42 (1h17m) ---
+# ve stream basis mel ~42 komentaru; poměrný práh = 45 * (77/120) = 28.9
 sent, _ = run(
-    [post("CEUTA", 28, age_hours=77 / 60)],
+    [post("CEUTA", 42, age_hours=77 / 60)],
     {},
     defaults=True, QUIET_HOURS="",
 )
 assert len(sent) == 1, sent
-assert "28 komentářů" in sent[0], sent[0]
+assert "42 komentářů" in sent[0], sent[0]
 print("OK: reálný propadlý případ (28 komentářů za 1h17m) se nově zachytí")
 print("   zpráva:", sent[0].split("\n")[0])
 
 # --- ale pomalý rozjezd ve stejném věku ne ---
-# 15 komentářů za 1h17m: pod poměrným prahem 19.25
+# 25 komentářů za 1h17m: pod poměrným prahem 28.9
 sent, _ = run(
-    [post("POMALY", 15, age_hours=77 / 60)],
+    [post("POMALY", 25, age_hours=77 / 60)],
     {},
     defaults=True, QUIET_HOURS="",
 )
@@ -429,9 +432,9 @@ assert sent == [], sent
 print("OK: pomalý rozjezd ve stejném věku mlčí")
 
 # --- podlaha: pár komentářů hned po zveřejnění nedělá poplach ---
-# 10 komentářů za 3 minuty, podlaha je 15
+# 20 komentářů za 3 minuty, podlaha je 22.5
 sent, _ = run(
-    [post("CERSTVY", 10, age_hours=3 / 60)],
+    [post("CERSTVY", 20, age_hours=3 / 60)],
     {},
     defaults=True, QUIET_HOURS="",
 )
@@ -445,5 +448,49 @@ assert watch.format_span(28 * 60) == "posledních 28 minut"
 assert watch.format_span(2 * H) == "poslední 2 hodiny"
 assert watch.format_span(5 * H) == "posledních 5 hodin"
 print("OK: skloňování délky měření")
+
+print("\nVšechny testy prošly.")
+
+# ==================== ZMĚNA ZPŮSOBU POČÍTÁNÍ ====================
+print("\n--- basis počítání komentářů ---")
+
+import tempfile as _tf
+
+# stav uložený v toplevel se při přepnutí na stream musí zahodit,
+# jinak by skok čísel udělal spike ze všech příspěvků naráz
+fd, path = _tf.mkstemp(suffix=".json")
+os.close(fd)
+with open(path, "w") as f:
+    json.dump({"_meta": {"filter": "toplevel"},
+               "A": {"samples": [[NOW - 2 * H, 68]]}}, f)
+loaded = watch.load_state(path, "stream")
+assert loaded == {}, loaded
+print("OK: změna basis zahodí historii")
+
+# stejný basis historii zachová
+loaded = watch.load_state(path, "toplevel")
+assert "A" in loaded and loaded["A"]["samples"] == [[NOW - 2 * H, 68]], loaded
+assert "_meta" not in loaded, loaded
+print("OK: stejný basis historii zachová")
+
+# save_state basis zapíše
+watch.save_state(path, {"A": {"samples": []}}, "stream")
+with open(path) as f:
+    saved = json.load(f)
+assert saved["_meta"] == {"filter": "stream"}, saved
+os.unlink(path)
+print("OK: basis se ukládá do stavu")
+
+# přepnutí basis nesmí vyvolat lavinu notifikací
+sent, state = run(
+    [post("A", 103), post("B", 200), post("C", 90)],
+    {"_meta": {"filter": "toplevel"},
+     "A": samples((3, 60), (2, 68)),
+     "B": samples((3, 120), (2, 130)),
+     "C": samples((3, 50), (2, 55))},
+    defaults=True, QUIET_HOURS="",
+)
+assert sent == [], sent
+print("OK: přepnutí basis nevyvolá lavinu notifikací")
 
 print("\nVšechny testy prošly.")

@@ -21,7 +21,7 @@ hodinu (v minutách 13 a 43):
 2. Aktuální počet zapíše do časové řady ve `state/fb_spike_state.json`.
 3. Spočítá **přírůstek za okno**: aktuální počet minus počet naměřený na
    začátku okna (výchozí 2 hodiny zpět).
-4. Když přírůstek překročí práh (výchozí 30), pošle notifikaci na Slack.
+4. Když přírůstek překročí práh (výchozí 45), pošle notifikaci na Slack.
 5. Workflow commitne aktualizovaný stav zpátky do repa.
 
 Sleduje se tedy **rychlost**, ne absolutní počet: příspěvek, který nasbíral
@@ -110,7 +110,8 @@ Volitelné proměnné prostředí:
 | Proměnná | Výchozí | Popis |
 |---|---|---|
 | `WINDOW_HOURS` | `2` | délka okna pro měření přírůstku |
-| `DELTA_THRESHOLD` | `30` | kolik komentářů musí v okně přibýt |
+| `DELTA_THRESHOLD` | `45` | kolik komentářů musí v okně přibýt |
+| `COMMENT_FILTER` | `stream` | `stream` počítá i odpovědi ve vláknech (sedí s Facebookem), `toplevel` jen první úroveň |
 | `COOLDOWN_HOURS` | = `WINDOW_HOURS` | jak dlouho po notifikaci mlčet u téhož příspěvku |
 | `LOOKBACK_DAYS` | `7` | kolik dní zpět hledat příspěvky |
 | `QUIET_HOURS` | `22-7` | noční klid, prázdná hodnota = vypnuto |
@@ -120,7 +121,21 @@ Volitelné proměnné prostředí:
 
 Nastavují se v workflow v sekci `env:` u kroku „Spustit sledování spiků".
 
-### Proč zrovna 2 hodiny / 30 komentářů
+### Počítání komentářů
+
+Graph API ve výchozím nastavení počítá jen komentáře **první úrovně**, takže
+hlásí zhruba o třetinu nižší číslo, než je vidět na Facebooku (naměřeno 68
+vs. 103 u téhož příspěvku). Skript proto používá `filter(stream)`, který
+zahrnuje i odpovědi ve vláknech — čísla v notifikaci pak sedí s tím, co
+uvidíš, až příspěvek otevřeš.
+
+Změna `COMMENT_FILTER` posune všechna čísla naráz, takže by porovnání
+s dosavadní základnou udělalo spike ze všech sledovaných příspěvků
+najednou. Skript si proto použitý způsob počítání ukládá do stavu a při
+změně historii zahodí a začne měřit znovu (první běh po přepnutí tedy
+nehlásí nic).
+
+### Proč zrovna 2 hodiny / 45 komentářů
 
 Na stránce nemá ~90 % příspěvků komentáře vůbec a několikrát týdně nějaký
 zničehonic vyběhne. Základní hladina je tedy skoro nula a práh může být
@@ -128,6 +143,9 @@ citlivý, aniž by to začalo šumět: 30 komentářů za 2 hodiny je tam samo
 o sobě výjimečné. Zároveň to hlásí dost brzy na to, aby se stihlo
 moderovat – konzervativnější „100 za 4 hodiny" se ozve, až když diskuze
 běží půl dne.
+
+Práh je 45 (ne 30), protože se počítají i odpovědi ve vláknech; v přepočtu
+na komentáře první úrovně to odpovídá zhruba původním 30.
 
 Po týdnu provozu je vhodné čísla doladit podle toho, kolik notifikací
 reálně chodí.
