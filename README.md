@@ -7,6 +7,9 @@ přibývají komentáře**.
 Zpráva vypadá takhle:
 
 > 🚨 U příspěvku přibylo za poslední 2 hodiny 68 komentářů (aktuálně 251).
+> _V otázce migrace se i středové a proevropské strany dostaly do vleku
+> krajní pravice a její demagogie_
+> https://www.facebook.com/tydenikrespekt/posts/…
 
 Smyslem je zachytit ty jednotky příspěvků týdně, které zničehonic vyběhnou,
 včas na to, aby se stihly moderovat.
@@ -51,6 +54,10 @@ přibylo 150 za dopoledne, je událost.
   že ještě nestihl nasbírat počet odpovídající plnému oknu — přesně to,
   co je u moderace potřeba chytit nejdřív. Práh přitom nikdy neklesne pod
   polovinu, aby pár komentářů pár minut po vydání nedělalo poplach.
+- **Popisek příspěvku.** Posty začínají „👉 https://rspkt.cz/… Vlastní
+  text"; šipka i zkrácený odkaz se z upozornění odloupnou (odkaz na
+  příspěvek je ve zprávě už jednou) a zbude jen text, kurzívou. Když po
+  očištění nic nezbude, řádek se vynechá.
 - **První pozorování staršího příspěvku nehlásí** – není z čeho přírůstek
   počítat. Ozve se až při dalším běhu.
 - **Cooldown.** Po notifikaci se u téhož příspěvku mlčí po dobu

@@ -47,6 +47,7 @@ import datetime
 import email.message
 import json
 import os
+import re
 import smtplib
 import sys
 import time
@@ -244,31 +245,56 @@ def in_quiet_hours(now, tz_name, spec):
     return hour >= start or hour < end
 
 
+def post_snippet(post, limit=160):
+    """Popisek příspěvku do zprávy, kurzívou.
+
+    Příspěvky obvykle začínají "👉 https://rspkt.cz/300011924 Vlastní text…".
+    Vedoucí emoji ani zkrácený odkaz v upozornění k ničemu nejsou — odkaz na
+    příspěvek je ve zprávě už jednou — takže se odloupnou a zbude jen text.
+    Vrací prázdný řetězec, když po očištění nic nezůstane.
+    """
+    text = " ".join((post.get("message") or "").split())
+
+    # Střídavě odloupávat vedoucí ozdoby a odkazy, dokud se něco mění:
+    # posty mívají i "👉 odkaz 👉 odkaz text".
+    prev = None
+    while prev != text:
+        prev = text
+        text = re.sub(r'^[^\w"\'„(\[]+', "", text)
+        text = re.sub(r"^https?://\S+\s*", "", text)
+
+    if not text:
+        return ""
+    if len(text) > limit:
+        text = text[:limit].rstrip(" ,.;:-") + "…"
+    return f"_{text}_"
+
+
+def compose(headline, post):
+    """Zpráva = titulek, popisek příspěvku (když nějaký je) a odkaz."""
+    parts = [headline, post_snippet(post), post.get("permalink_url", "")]
+    return "\n".join(part for part in parts if part)
+
+
 def send_night_escalation(sinks, post, delta, comment_count, elapsed):
     """V noci se běžně mlčí, tohle je ale moc velké na to nechat běžet do rána."""
-    message = post.get("message", "").strip()
-    snippet = (message[:120] + "…") if len(message) > 120 else message
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
-    text = (
+    text = compose(
         f"🚨 *I přes noční klid:* u příspěvku přibylo za "
         f"{format_span(elapsed)} {delta} {komentaru} "
-        f"(aktuálně {comment_count}). Nejspíš to chce moderaci hned.\n"
-        f"{snippet}\n"
-        f"{post.get('permalink_url', '')}"
+        f"(aktuálně {comment_count}). Nejspíš to chce moderaci hned.",
+        post,
     )
     return deliver(sinks, text)
 
 
 def send_night_summary(sinks, post, delta, comment_count, elapsed):
     """Ráno po nočním klidu: co se v noci semlelo."""
-    message = post.get("message", "").strip()
-    snippet = (message[:120] + "…") if len(message) > 120 else message
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
-    text = (
+    text = compose(
         f"🌙 Přes noc u příspěvku přibylo až {delta} {komentaru} "
-        f"za {format_span(elapsed)} (aktuálně {comment_count}).\n"
-        f"{snippet}\n"
-        f"{post.get('permalink_url', '')}"
+        f"za {format_span(elapsed)} (aktuálně {comment_count}).",
+        post,
     )
     return deliver(sinks, text)
 
@@ -302,14 +328,11 @@ def baseline_for(post, entry, now, window_seconds):
 
 
 def send_spike_notification(sinks, post, delta, comment_count, elapsed):
-    message = post.get("message", "").strip()
-    snippet = (message[:120] + "…") if len(message) > 120 else message
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
-    text = (
+    text = compose(
         f"🚨 U příspěvku přibylo za {format_span(elapsed)} "
-        f"{delta} {komentaru} (aktuálně {comment_count}).\n"
-        f"{snippet}\n"
-        f"{post.get('permalink_url', '')}"
+        f"{delta} {komentaru} (aktuálně {comment_count}).",
+        post,
     )
     return deliver(sinks, text)
 

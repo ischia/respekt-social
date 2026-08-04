@@ -581,3 +581,58 @@ assert "🚨" in src and "🌙" in src
 print("OK: emoji jako znaky, ne slackové zkratky")
 
 print("\nVšechny testy prošly.")
+
+# ==================== POPISEK PŘÍSPĚVKU ====================
+print("\n--- popisek příspěvku ---")
+
+def snip(msg):
+    return watch.post_snippet({"message": msg})
+
+# reálný tvar postů Respektu: šipka + zkrácený odkaz + text
+assert snip("👉 https://rspkt.cz/300011924 V otázce migrace se i středové "
+            "a proevropské strany dostaly do vleku krajní pravice") == (
+    "_V otázce migrace se i středové a proevropské strany dostaly "
+    "do vleku krajní pravice_")
+print("OK: odloupne emoji i odkaz, text nechá kurzívou")
+
+# víc ozdob a odkazů za sebou
+assert snip("➡️ https://rspkt.cz/1 👉 https://rspkt.cz/2 Text") == "_Text_"
+print("OK: odloupne i opakované emoji a odkazy")
+
+# text bez ozdob zůstane
+assert snip("Text bez odkazu i bez emoji.") == "_Text bez odkazu i bez emoji._"
+print("OK: čistý text projde beze změny")
+
+# uvozovky na začátku nejsou ozdoba
+assert snip('„Citace zůstane," řekl někdo').startswith('_„Citace')
+print("OK: uvozovky na začátku se neodloupnou")
+
+# odkaz uprostřed je součást textu
+assert "https://example.cz" in snip("Podrobnosti na https://example.cz najdete")
+print("OK: odkaz uprostřed textu zůstává")
+
+# post bez textu / jen odkaz -> žádný popisek
+assert snip("https://rspkt.cz/999") == ""
+assert snip("") == ""
+assert watch.post_snippet({}) == ""
+print("OK: prázdný popisek se vynechá")
+
+# dlouhý text se zkrátí
+long = watch.post_snippet({"message": "👉 https://rspkt.cz/1 " + "slovo " * 100})
+assert long.endswith("…_") and len(long) < 200, len(long)
+print("OK: dlouhý popisek se zkrátí")
+
+# víceřádkový text se srovná do jednoho řádku
+assert "\n" not in snip("První řádek\n\ndruhý řádek")
+print("OK: popisek je vždy jednořádkový")
+
+# celá zpráva: titulek, kurzívový popisek, odkaz — a bez prázdných řádků
+msg = watch.compose("TITULEK", {"message": "👉 https://rspkt.cz/1 Popis",
+                                "permalink_url": "https://fb.com/x"})
+assert msg == "TITULEK\n_Popis_\nhttps://fb.com/x", repr(msg)
+msg = watch.compose("TITULEK", {"message": "https://rspkt.cz/1",
+                                "permalink_url": "https://fb.com/x"})
+assert msg == "TITULEK\nhttps://fb.com/x", repr(msg)
+print("OK: skladba zprávy bez prázdných řádků")
+
+print("\nVšechny testy prošly.")
