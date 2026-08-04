@@ -1,57 +1,73 @@
-# FB Comment Spike Watch – Make.com scénář
+# Spouštění přes Make.com
 
-Sleduje FB stránku Respektu, kontroluje příspěvky za posledních 7 dní a pošle
-Slack notifikaci, pokud má některý příspěvek víc než 50 komentářů.
+GitHub Actions cron se u tohohle repozitáře ukázal jako nepoužitelný: za
+dvě hodiny po nasazení vynechal **všechny čtyři** naplánované sloty, přes noc
+jel s rozestupy 2–4 hodiny místo jedné. Detekce spiků přitom stojí a padá
+s tím, jak často se měří.
 
-**Prah 50 komentářů je zatím pevný fixní práh (v1).** Později se nahradí
-logikou založenou na rychlosti přírůstku za časový interval (např. z-score
-oproti historii stránky) – k tomu bude potřeba ukládat historii počtu
-komentářů (Make Data Store nebo externí storage).
+Řešení: Make.com scénář, který v pravidelném intervalu odpálí workflow přes
+GitHub API. Cron ve workflow zůstává jako záloha — když občas vystřelí, nic
+se nezkazí (běh navíc jen zapíše další měření).
 
-## Import blueprintu
+## 1. Vytvoř GitHub token
 
-1. V Make: **Scenarios → Create a new scenario → ⋮ (vpravo nahoře) → Import Blueprint**
-2. Nahraj `fb-comment-spike-watch.blueprint.json`
-3. Po importu Make požádá o doplnění connections u obou HTTP modulů – u
-   HTTP modulů žádná connection není potřeba (jde o generický HTTP modul,
-   ne o vyhrazenou Facebook Pages / Slack appku), stačí doplnit hodnoty níže.
+github.com → Settings (účtu, ne repa) → Developer settings → Personal access
+tokens → **Fine-grained tokens** → Generate new token
 
-## Co je potřeba doplnit ručně po importu
+- **Token name**: `make-fb-spike-watch`
+- **Expiration**: podle chuti; při „No expiration" si aspoň poznamenej, že
+  existuje. Jinak počítej s tím, že po expiraci spouštění tiše přestane
+  fungovat.
+- **Repository access**: Only select repositories → `ischia/respekt-social`
+- **Permissions** → Repository permissions → **Actions**: `Read and write`
+  (nic jiného není potřeba)
 
-V modulu **1. Načíst příspěvky**:
-- `{{PAGE_ID}}` → nahraď ID FB stránky Respektu (najdeš přes
-  `https://graph.facebook.com/PAGE_USERNAME?fields=id&access_token=...`
-  nebo v Page Transparency / About sekci stránky)
-- `{{FB_PAGE_ACCESS_TOKEN}}` → Page Access Token (viz předchozí diskuze
-  o System User tokenu, nebo dočasně Page Access Token z Graph API Exploreru
-  pro rychlé otestování – ten ale expiruje po pár hodinách)
+Generate token → zkopíruj (`github_pat_…`). Zobrazí se jen jednou.
 
-V modulu **3. Poslat Slack notifikaci**:
-- `{{SLACK_WEBHOOK_PATH}}` → nahraď částí URL z tvého Slack Incoming
-  Webhooku (Slack App → Incoming Webhooks → Add New Webhook to Workspace →
-  zkopíruj celou URL a nahraď jí celé `url` pole, nejjednodušší je
-  přepsat celé pole `url` v modulu 3 vlastní webhook URL)
+## 2. Scénář v Make
 
-## Harmonogram
+Scenarios → Create a new scenario → přidej modul **HTTP → Make a request**:
 
-Scénář je nastaven na běh **každou hodinu** (`scheduling.interval: 3600`
-v blueprintu). Po importu zkontroluj v Make záložku **Scheduling** u
-scénáře, jestli se interval načetl – pokud ne, nastav ručně "Run every 1 hour".
+| Pole | Hodnota |
+|---|---|
+| URL | `https://api.github.com/repos/ischia/respekt-social/actions/workflows/fb-spike-watch.yml/dispatches` |
+| Method | `POST` |
+| Headers | `Authorization` = `Bearer github_pat_…`<br>`Accept` = `application/vnd.github+json`<br>`X-GitHub-Api-Version` = `2022-11-28` |
+| Body type | `Raw` |
+| Content type | `JSON (application/json)` |
+| Request content | `{"ref":"main"}` |
+| Parse response | vypnuto (GitHub vrací prázdné tělo) |
 
-## Pokud import blueprintu selže nebo vypadá rozbitě
+Scheduling (ikona hodin dole vlevo): **Every 30 minutes**.
 
-Postav scénář ručně, moduly v tomto pořadí:
+Ulož a zapni scénář (toggle vpravo nahoře).
 
-1. **HTTP → Make a request**
-   - Method: `GET`
-   - URL: `https://graph.facebook.com/v19.0/{PAGE_ID}/posts?fields=id,message,created_time,permalink_url,comments.summary(true).limit(0)&since={timestamp 7 dní zpět}&limit=100&access_token={TOKEN}`
-2. **Flow Control → Iterator**
-   - Array: `{{1.data}}` (výstup z předchozího HTTP modulu)
-3. **Filter** (mezi Iteratorem a dalším modulem)
-   - Podmínka: `{{2.comments.summary.total_count}}` **Greater than** `50`
-4. **HTTP → Make a request** (Slack)
-   - Method: `POST`
-   - URL: tvůj Slack Incoming Webhook
-   - Body type: Raw / JSON
-   - Content: `{"text": "Příspěvek má přes 50 komentářů: {{2.permalink_url}}"}`
-5. V nastavení scénáře (ozubené kolo) nastav **Scheduling → Run every 1 hour**
+### Pozor na limit operací
+
+Free tier Make má 1000 operací měsíčně. Při spouštění po 30 minutách je to
+~1440 — limit by došel kolem 20. dne. Možnosti:
+
+- interval **45 minut** (~960/měsíc) se do free tieru vejde
+- nebo nejnižší placený plán a interval 20–30 minut
+
+Kratší interval = dřívější detekce, ale rozdíl mezi 30 a 45 minutami je
+u dvouhodinového okna malý.
+
+## 3. Ověření
+
+Po prvním spuštění (tlačítko „Run once") zkontroluj:
+
+- v Make: modul vrátil **204 No Content** — to je úspěch, GitHub na
+  `dispatches` nevrací žádné tělo
+- v GitHubu: Actions → měl by přibýt běh s událostí `workflow_dispatch`
+
+Když modul vrátí **404**, token nemá právo `Actions: Read and write` nebo
+nevidí repozitář. Když **401**, token je špatně zkopírovaný nebo expiroval.
+
+## Co se stane, když spouštění vypadne
+
+Skript je na výpadky odolný: základnu bere z nejnovějšího měření *před*
+začátkem okna, takže delší mezera přírůstek spíš nadhodnotí, než aby ho
+ztratila. Historie se u každého příspěvku drží na dvojnásobek okna, takže
+mezera do 4 hodin se ustojí. Delší výpadek znamená, že se u příspěvku začne
+měřit od nejstaršího dostupného vzorku.
