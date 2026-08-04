@@ -1,27 +1,28 @@
 # respekt-social
 
 Sledování facebookové stránky Respektu – hlídá příspěvky za posledních 7 dní
-a hlásí na Slack, když některému **prudce přibývají komentáře**.
+a hlásí do Slacku, Google Chatu nebo mailem, když některému **prudce
+přibývají komentáře**.
 
 Zpráva vypadá takhle:
 
-> :rotating_light: U příspěvku přibylo za poslední 2 hodiny více než 30
-> komentářů (aktuálně 251, přírůstek 68).
+> 🚨 U příspěvku přibylo za poslední 2 hodiny 68 komentářů (aktuálně 251).
 
 Smyslem je zachytit ty jednotky příspěvků týdně, které zničehonic vyběhnou,
 včas na to, aby se stihly moderovat.
 
 ## Jak to funguje
 
-`scripts/fb_comment_spike_watch.py` běží přes GitHub Actions dvakrát za
-hodinu (v minutách 13 a 43):
+`scripts/fb_comment_spike_watch.py` běží přes GitHub Actions každých
+30 minut (spouští ho Make.com, viz [make/README.md](make/README.md)):
 
 1. Stáhne z Graph API příspěvky stránky za posledních 7 dní i s počtem
    komentářů (`comments.summary(true)`).
 2. Aktuální počet zapíše do časové řady ve `state/fb_spike_state.json`.
 3. Spočítá **přírůstek za okno**: aktuální počet minus počet naměřený na
    začátku okna (výchozí 2 hodiny zpět).
-4. Když přírůstek překročí práh (výchozí 45), pošle notifikaci na Slack.
+4. Když přírůstek překročí práh (výchozí 45), pošle upozornění do
+   nastavených kanálů.
 5. Workflow commitne aktualizovaný stav zpátky do repa.
 
 Sleduje se tedy **rychlost**, ne absolutní počet: příspěvek, který nasbíral
@@ -30,9 +31,9 @@ přibylo 150 za dopoledne, je událost.
 
 ### Detaily chování
 
-- **Základnou je začátek okna, ne poslední běh.** Při hodinovém běhu a
-  2hodinovém okně se porovnává se stavem před 2 hodinami – spike se pozná,
-  i když roste plynule (např. +20 každou hodinu).
+- **Základnou je začátek okna, ne poslední běh.** Porovnává se se stavem
+  před 2 hodinami, ne s předchozím měřením – spike se pozná, i když roste
+  plynule (např. +20 každou hodinu).
 - **Noční klid.** Mezi 22:00 a 7:00 (`QUIET_HOURS`, čas podle `TIMEZONE`)
   se dál měří, ale nenotifikuje. Pokud v noci něco vyběhlo, přijde ráno
   souhrn („Přes noc u příspěvku přibylo až N komentářů"). Bez toho by
@@ -55,8 +56,8 @@ přibylo 150 za dopoledne, je událost.
 - **Cooldown.** Po notifikaci se u téhož příspěvku mlčí po dobu
   `COOLDOWN_HOURS` (výchozí = délka okna), aby jedna vášnivá diskuze
   nehlásila každou hodinu.
-- **Selhání Slacku** neshodí běh a nezapíše cooldown – příští běh to zkusí
-  znovu, místo aby se spike tiše ztratil.
+- **Selhání kanálu** neshodí běh. Když neuspěje ani jeden, cooldown se
+  nezapíše a příští běh to zkusí znovu, místo aby se spike tiše ztratil.
 - **Úklid.** Příspěvky, které vypadnou ze 7denního okna, se ze stavového
   souboru odstraní; historie měření se u každého drží jen na 2× délku okna.
 
@@ -121,13 +122,16 @@ jinak může Facebook vyžadovat Business Verification.
 
 ## Spuštění
 
-Automaticky každé 2 hodiny (cron ve workflow), nebo ručně:
-Actions → *FB Comment Spike Watch* → Run workflow.
+Spouští ho Make.com každých 30 minut (viz [make/README.md](make/README.md)).
+Cron ve workflow zůstává jako záloha – GitHub ho u tohohle repozitáře
+nedodržuje, viz sekci o spolehlivosti níž. Ručně: Actions →
+*FB Comment Spike Watch* → Run workflow.
 
 Lokálně:
 
 ```bash
-export FB_PAGE_ID=... FB_PAGE_ACCESS_TOKEN=... SLACK_WEBHOOK_URL=...
+export FB_PAGE_ID=... FB_PAGE_ACCESS_TOKEN=...
+export SLACK_WEBHOOK_URL=...   # nebo GOOGLE_CHAT_WEBHOOK_URL, nebo SMTP_HOST + MAIL_TO
 python3 scripts/fb_comment_spike_watch.py
 ```
 
@@ -167,10 +171,11 @@ nehlásí nic).
 
 ### Proč zrovna 2 hodiny / 45 komentářů
 
-Na stránce nemá ~90 % příspěvků komentáře vůbec a několikrát týdně nějaký
-zničehonic vyběhne. Základní hladina je tedy skoro nula a práh může být
-citlivý, aniž by to začalo šumět: 30 komentářů za 2 hodiny je tam samo
-o sobě výjimečné. Zároveň to hlásí dost brzy na to, aby se stihlo
+Naměřeno na reálném týdnu: 80 příspěvků, medián 2 komentáře, třetina bez
+komentářů úplně. Nad 150 komentářů se dostalo šest příspěvků – a mezi nimi
+a zbytkem je propast (195, pak 47). Výběhy jsou tedy od běžného provozu
+jasně oddělené a základní hladina je skoro nula, takže práh může být
+citlivý, aniž by to začalo šumět. Zároveň to hlásí dost brzy na to, aby se stihlo
 moderovat – konzervativnější „100 za 4 hodiny" se ozve, až když diskuze
 běží půl dne.
 
@@ -180,17 +185,17 @@ na komentáře první úrovně to odpovídá zhruba původním 30.
 Po týdnu provozu je vhodné čísla doladit podle toho, kolik notifikací
 reálně chodí.
 
-### Spolehlivost cronu
+### Proč spouští Make, a ne cron ve workflow
 
-GitHub scheduled workflows nejsou přesné. V ostrém provozu vycházely
-rozestupy mezi běhy **2 až 4 hodiny** místo požadované jedné — runnery pod
-zátěží běhy tiše zahazují, nejvíc v minutě 0, kdy startuje půlka světa.
-Proto cron míří na minuty 13 a 43: mimo špičku a dvakrát za hodinu, aby
-zahozený běh tolik nevadil.
+GitHub scheduled workflows se u tohohle repozitáře ukázaly jako
+nepoužitelné. Přes noc jely s rozestupy 2–4 hodiny místo požadované jedné
+a po přesunu cronu mimo špičku (minuty 13 a 43) vynechaly **všechny čtyři**
+sloty během dvou hodin. Detekce spiků přitom stojí a padá na tom, jak často
+se měří.
 
-Pokud by rozestupy zůstaly příliš velké, jediné spolehlivé řešení je
-spouštět to mimo GitHub Actions (vlastní cron, cloud scheduler) a workflow
-nechat jen jako zálohu.
+Spouštění proto obstarává Make.com přes `workflow_dispatch` každých
+30 minut. Cron ve workflow zůstává jako záloha — když občas vystřelí,
+jen přibude další měření.
 
 ## Co dál
 
