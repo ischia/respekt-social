@@ -2,7 +2,8 @@
 """
 FB Comment Spike Watch
 Sleduje příspěvky na FB stránce Respektu za posledních 7 dní a upozorňuje
-na Slacku, když příspěvku *přibude* za sledované okno (výchozí 2 hodiny)
+na Slacku, v Google Chatu nebo mailem, když příspěvku *přibude* za
+sledované okno (výchozí 2 hodiny)
 víc než daný počet komentářů (výchozí 45).
 
 Hlídá se tedy rychlost přírůstku, ne absolutní počet: příspěvek, který
@@ -16,7 +17,12 @@ Vyžaduje proměnné prostředí:
     FB_PAGE_ID              - ID facebookové stránky
     FB_PAGE_ACCESS_TOKEN    - Page Access Token s pages_read_engagement
                               a pages_read_user_content
-    SLACK_WEBHOOK_URL       - Incoming Webhook URL pro kanál
+
+Alespoň jeden kanál pro upozornění (dá se jich zapnout víc naráz):
+    SLACK_WEBHOOK_URL       - Slack Incoming Webhook
+    GOOGLE_CHAT_WEBHOOK_URL - webhook prostoru v Google Chatu
+    SMTP_HOST + MAIL_TO     - odesílání mailem; volitelně SMTP_PORT (587),
+                              SMTP_USER, SMTP_PASSWORD, MAIL_FROM
 
 Volitelné:
     WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 2)
@@ -38,8 +44,10 @@ Volitelné:
 """
 
 import datetime
+import email.message
 import json
 import os
+import smtplib
 import sys
 import time
 import urllib.error
@@ -236,33 +244,33 @@ def in_quiet_hours(now, tz_name, spec):
     return hour >= start or hour < end
 
 
-def send_night_escalation(webhook_url, post, delta, comment_count, elapsed):
+def send_night_escalation(sinks, post, delta, comment_count, elapsed):
     """V noci se běžně mlčí, tohle je ale moc velké na to nechat běžet do rána."""
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
     text = (
-        f":rotating_light: *I přes noční klid:* u příspěvku přibylo za "
+        f"🚨 *I přes noční klid:* u příspěvku přibylo za "
         f"{format_span(elapsed)} {delta} {komentaru} "
         f"(aktuálně {comment_count}). Nejspíš to chce moderaci hned.\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
-    return post_to_slack(webhook_url, text)
+    return deliver(sinks, text)
 
 
-def send_night_summary(webhook_url, post, delta, comment_count, elapsed):
+def send_night_summary(sinks, post, delta, comment_count, elapsed):
     """Ráno po nočním klidu: co se v noci semlelo."""
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
     text = (
-        f":crescent_moon: Přes noc u příspěvku přibylo až {delta} {komentaru} "
+        f"🌙 Přes noc u příspěvku přibylo až {delta} {komentaru} "
         f"za {format_span(elapsed)} (aktuálně {comment_count}).\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
-    return post_to_slack(webhook_url, text)
+    return deliver(sinks, text)
 
 
 def baseline_for(post, entry, now, window_seconds):
@@ -293,42 +301,116 @@ def baseline_for(post, entry, now, window_seconds):
     return samples[0][1], samples[0][0]
 
 
-def send_slack_notification(webhook_url, post, delta, comment_count, elapsed):
+def send_spike_notification(sinks, post, delta, comment_count, elapsed):
     message = post.get("message", "").strip()
     snippet = (message[:120] + "…") if len(message) > 120 else message
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
     text = (
-        f":rotating_light: U příspěvku přibylo za {format_span(elapsed)} "
+        f"🚨 U příspěvku přibylo za {format_span(elapsed)} "
         f"{delta} {komentaru} (aktuálně {comment_count}).\n"
         f"{snippet}\n"
         f"{post.get('permalink_url', '')}"
     )
-    return post_to_slack(webhook_url, text)
+    return deliver(sinks, text)
 
 
-def post_to_slack(webhook_url, text):
-    # Selhání Slacku nesmí shodit celý běh — jinak by se neuložil stav a
-    # příště by se už odeslané notifikace poslaly znovu.
+def webhook_json(url, payload, name):
+    """Pošle JSON na webhook. Vrací True při úspěchu, jinak zaloguje důvod."""
     try:
-        status, body = http_post_json(webhook_url, {"text": text})
+        status, body = http_post_json(url, payload)
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")
-        print(f"Slack webhook selhal ({e.code}): {detail}", file=sys.stderr)
+        print(f"{name} selhal ({e.code}): {detail}", file=sys.stderr)
         return False
     except urllib.error.URLError as e:
-        print(f"Slack webhook nedostupný: {e.reason}", file=sys.stderr)
+        print(f"{name} nedostupný: {e.reason}", file=sys.stderr)
         return False
 
-    if status != 200:
-        print(f"Slack webhook vrátil status {status}: {body}", file=sys.stderr)
+    if status not in (200, 204):
+        print(f"{name} vrátil status {status}: {body}", file=sys.stderr)
         return False
     return True
+
+
+def send_email(text):
+    """Pošle upozornění mailem přes SMTP. Předmět je první řádek zprávy."""
+    host = os.environ["SMTP_HOST"]
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER", "")
+    password = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("MAIL_FROM") or user
+    recipients = [a.strip() for a in os.environ["MAIL_TO"].split(",") if a.strip()]
+
+    lines = text.split("\n")
+    msg = email.message.EmailMessage()
+    msg["Subject"] = lines[0][:200]
+    msg["From"] = sender
+    msg["To"] = ", ".join(recipients)
+    msg.set_content(text)
+
+    try:
+        with smtplib.SMTP(host, port, timeout=20) as smtp:
+            smtp.starttls()
+            if user:
+                smtp.login(user, password)
+            smtp.send_message(msg)
+    except (smtplib.SMTPException, OSError) as e:
+        print(f"E-mail se nepodařilo odeslat: {e}", file=sys.stderr)
+        return False
+    return True
+
+
+def build_sinks():
+    """Kanály, do kterých se hlásí. Nastavuje se tím, co je v prostředí.
+
+    Slack i Google Chat berou stejný tvar {"text": ...}, takže se liší jen
+    adresou. Alespoň jeden kanál musí být nastavený, jinak by skript měřil
+    do prázdna.
+    """
+    sinks = []
+
+    slack = os.environ.get("SLACK_WEBHOOK_URL")
+    if slack:
+        sinks.append(("Slack", lambda t, u=slack: webhook_json(u, {"text": t}, "Slack")))
+
+    chat = os.environ.get("GOOGLE_CHAT_WEBHOOK_URL")
+    if chat:
+        sinks.append(
+            ("Google Chat", lambda t, u=chat: webhook_json(u, {"text": t}, "Google Chat"))
+        )
+
+    if os.environ.get("SMTP_HOST") and os.environ.get("MAIL_TO"):
+        sinks.append(("e-mail", send_email))
+
+    if not sinks:
+        print(
+            "Není nastavený žádný kanál pro upozornění — nastav SLACK_WEBHOOK_URL, "
+            "GOOGLE_CHAT_WEBHOOK_URL nebo SMTP_HOST + MAIL_TO.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return sinks
+
+
+def deliver(sinks, text):
+    """Rozešle zprávu do všech nastavených kanálů.
+
+    Za doručené se považuje, když uspěl aspoň jeden kanál. Kdyby stačilo až
+    "všechny", jeden rozbitý kanál by způsobil, že se zpráva pošle znovu při
+    každém běhu — a do funkčních kanálů by chodila pořád dokola.
+    """
+    ok_any = False
+    for name, send in sinks:
+        if send(text):
+            ok_any = True
+        else:
+            print(f"Kanál {name} zprávu nepřijal.", file=sys.stderr)
+    return ok_any
 
 
 def main():
     page_id = env("FB_PAGE_ID", required=True)
     access_token = env("FB_PAGE_ACCESS_TOKEN", required=True)
-    slack_webhook = env("SLACK_WEBHOOK_URL", required=True)
     window_hours = int(env("WINDOW_HOURS", "2"))
     threshold = int(env("DELTA_THRESHOLD", "45"))
     cooldown_hours = int(env("COOLDOWN_HOURS", str(window_hours)))
@@ -340,6 +422,8 @@ def main():
     escalation_factor = float(env("NIGHT_ESCALATION_FACTOR", "3"))
     # 0 = v noci nikdy nerušit, ani při sebevětším náporu.
     escalation_at = threshold * escalation_factor if escalation_factor > 0 else None
+
+    sinks = build_sinks()
 
     now = int(time.time())
     window_seconds = window_hours * 3600
@@ -378,7 +462,7 @@ def main():
         # zmizel, protože do rána vypadne z okna.
         if not quiet and "pending_delta" in entry:
             ok = send_night_summary(
-                slack_webhook,
+                sinks,
                 post,
                 entry["pending_delta"],
                 entry.get("pending_count", comment_count),
@@ -414,7 +498,7 @@ def main():
             # diskuze je horší než jeden probuzený člověk.
             if escalation_at and delta >= escalation_at:
                 ok = send_night_escalation(
-                    slack_webhook, post, delta, comment_count, elapsed
+                    sinks, post, delta, comment_count, elapsed
                 )
                 if ok:
                     entry["last_alert_ts"] = now
@@ -434,8 +518,8 @@ def main():
                 entry["pending_elapsed"] = elapsed
             continue
 
-        ok = send_slack_notification(
-            slack_webhook, post, delta, comment_count, elapsed
+        ok = send_spike_notification(
+            sinks, post, delta, comment_count, elapsed
         )
         if ok:
             entry["last_alert_ts"] = now

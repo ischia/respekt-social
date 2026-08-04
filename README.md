@@ -70,9 +70,39 @@ Settings → Secrets and variables → Actions → New repository secret:
 |---|---|
 | `FB_PAGE_ID` | ID facebookové stránky |
 | `FB_PAGE_ACCESS_TOKEN` | Page Access Token s `pages_read_engagement` a `pages_read_user_content` |
-| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL |
 
-### 2. Slack Incoming Webhook
+A **aspoň jeden kanál** pro upozornění; nenastavený secret = kanál vypnutý,
+dá se jich zapnout i víc naráz:
+
+| Secret | Kanál |
+|---|---|
+| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook |
+| `GOOGLE_CHAT_WEBHOOK_URL` | webhook prostoru v Google Chatu |
+| `SMTP_HOST` + `MAIL_TO` | e-mail; volitelně `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT` (587), `MAIL_FROM` |
+
+Zpráva se považuje za doručenou, když uspěl **aspoň jeden** kanál. Kdyby se
+čekalo na všechny, jeden rozbitý kanál by způsobil, že se to samé posílá do
+funkčních kanálů při každém běhu znovu.
+
+### Google Chat
+
+V prostoru: **Apps & integrations → Webhooks → Add webhook** → zkopírovat
+URL. Vyžaduje Google Workspace; pokud jsou webhooky v organizaci zakázané,
+musí je povolit admin.
+
+### E-mail
+
+Přes SMTP, bez další knihovny. U Gmailu / Workspace je potřeba **App
+Password** (vyžaduje zapnuté dvoufázové ověření), ne běžné heslo:
+`SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER` = adresa,
+`SMTP_PASSWORD` = app password. `MAIL_TO` snese víc adres oddělených čárkou.
+
+E-mail je z těch tří kanálů nejpomalejší — doručuje se se zpožděním a snadno
+zapadne. Jako jediný kanál pro něco, co se má stihnout moderovat, ho
+nedoporučuju; dává smysl vedle Slacku nebo Chatu, aby se o výběhu dozvěděl
+i někdo, kdo chat nepoužívá.
+
+### 2. Slack Incoming Webhook (pokud používáš Slack)
 
 api.slack.com/apps → Create New App → From scratch → Incoming Webhooks
 (zapnout) → Add New Webhook to Workspace → vybrat kanál → zkopírovat URL.

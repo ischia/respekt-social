@@ -58,6 +58,7 @@ def run(posts, state, slack_fails=False, defaults=False, **env):
         sent.append(payload["text"])
         return 200, "ok"
 
+
     watch.http_post_json = fake_post
 
     fd, path = tempfile.mkstemp(suffix=".json")
@@ -492,5 +493,91 @@ sent, state = run(
 )
 assert sent == [], sent
 print("OK: přepnutí basis nevyvolá lavinu notifikací")
+
+print("\nVšechny testy prošly.")
+
+# ==================== KANÁLY PRO UPOZORNĚNÍ ====================
+print("\n--- kanály ---")
+
+def run_channels(env_channels, post_ok=True, mail_ok=True):
+    """Spustí jeden spike a vrátí, kam se doručilo."""
+    calls = {"webhooks": [], "mail": 0}
+
+    def fake_post(url, payload):
+        calls["webhooks"].append(url)
+        if not post_ok:
+            raise urllib.error.URLError("down")
+        return 200, "ok"
+
+    def fake_smtp(text):
+        calls["mail"] += 1
+        return mail_ok
+
+    watch.http_post_json = fake_post
+    watch.send_email = fake_smtp
+    watch.fetch_posts = lambda *a, **k: [post("A", 1251)]
+
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    with open(path, "w") as f:
+        json.dump({"_meta": {"filter": "stream"},
+                   "A": samples((6, 1000), (4, 1100), (2, 1200))}, f)
+
+    for k in ("SLACK_WEBHOOK_URL", "GOOGLE_CHAT_WEBHOOK_URL", "SMTP_HOST", "MAIL_TO"):
+        os.environ.pop(k, None)
+    os.environ.update(FB_PAGE_ID="1", FB_PAGE_ACCESS_TOKEN="t", STATE_FILE=path,
+                      WINDOW_HOURS="4", DELTA_THRESHOLD="100", QUIET_HOURS="",
+                      **env_channels)
+    watch.main()
+    with open(path) as f:
+        st = json.load(f)
+    os.unlink(path)
+    return calls, st["A"]
+
+SLACK = "https://hooks.slack.com/services/x"
+CHAT = "https://chat.googleapis.com/v1/spaces/x"
+
+# jen Slack
+calls, entry = run_channels({"SLACK_WEBHOOK_URL": SLACK})
+assert calls["webhooks"] == [SLACK], calls
+assert calls["mail"] == 0
+print("OK: jen Slack")
+
+# jen Google Chat
+calls, entry = run_channels({"GOOGLE_CHAT_WEBHOOK_URL": CHAT})
+assert calls["webhooks"] == [CHAT], calls
+print("OK: jen Google Chat")
+
+# jen mail
+calls, entry = run_channels({"SMTP_HOST": "smtp.example.com", "MAIL_TO": "a@b.cz"})
+assert calls["webhooks"] == [] and calls["mail"] == 1, calls
+print("OK: jen mail")
+
+# všechny tři naráz
+calls, entry = run_channels({"SLACK_WEBHOOK_URL": SLACK, "GOOGLE_CHAT_WEBHOOK_URL": CHAT,
+                             "SMTP_HOST": "smtp.example.com", "MAIL_TO": "a@b.cz"})
+assert calls["webhooks"] == [SLACK, CHAT], calls
+assert calls["mail"] == 1, calls
+assert entry["last_alert_ts"] > 0
+print("OK: všechny tři kanály naráz")
+
+# jeden kanál spadne, druhý doručí -> bere se jako doručeno (žádné opakování)
+calls, entry = run_channels({"SLACK_WEBHOOK_URL": SLACK, "SMTP_HOST": "smtp.example.com",
+                             "MAIL_TO": "a@b.cz"}, post_ok=False)
+assert calls["mail"] == 1, calls
+assert entry["last_alert_ts"] > 0, entry
+print("OK: stačí jeden funkční kanál")
+
+# spadnou všechny -> cooldown se nenastaví, příště se zkusí znovu
+calls, entry = run_channels({"SLACK_WEBHOOK_URL": SLACK, "SMTP_HOST": "smtp.example.com",
+                             "MAIL_TO": "a@b.cz"}, post_ok=False, mail_ok=False)
+assert "last_alert_ts" not in entry, entry
+print("OK: selhání všech kanálů nezapíše cooldown")
+
+# unicode emoji (Slack shortcodes se v Chatu ani mailu nevykreslí)
+src = SCRIPT.read_text()
+assert ":rotating_light:" not in src and ":crescent_moon:" not in src
+assert "🚨" in src and "🌙" in src
+print("OK: emoji jako znaky, ne slackové zkratky")
 
 print("\nVšechny testy prošly.")

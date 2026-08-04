@@ -29,7 +29,14 @@ jobs:
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          # Kanály pro upozornění — stačí jeden, dá se jich zapnout víc.
+          # Nenastavený secret = kanál vypnutý.
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
           # Ladicí parametry — po týdnu provozu je vhodné je upravit
           # podle toho, kolik notifikací reálně chodí.
           WINDOW_HOURS: "2"       # v jak dlouhém okně se přírůstek měří
