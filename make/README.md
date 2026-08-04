@@ -59,6 +59,13 @@ spolehlivou základnu stačí, a nechává skoro třetinu rozpočtu jako rezervu
 20 minut se taky vejde. Pod 15 minut nemá smysl chodit — přínos je malý
 a rezerva mizí.
 
+### Noční klid se ve scénáři neřeší
+
+Scénář musí spouštět workflow **i v noci**. Noční ticho zajišťuje skript
+(`QUIET_HOURS`), který v noci dál měří, jen neposílá notifikace. Kdyby se
+v noci netriggerovalo, nefungoval by ranní souhrn, noční eskalace při velkém
+náporu ani základna pro první ranní měření.
+
 ## 3. Ověření
 
 Po prvním spuštění (tlačítko „Run once") zkontroluj:
