@@ -330,7 +330,7 @@ def baseline_for(post, entry, now, window_seconds):
 def send_spike_notification(sinks, post, delta, comment_count, elapsed):
     komentaru = plural(delta, "komentář", "komentáře", "komentářů")
     text = compose(
-        f"🚨 U příspěvku přibylo za {format_span(elapsed)} "
+        f"U příspěvku přibylo za {format_span(elapsed)} "
         f"{delta} {komentaru} (aktuálně {comment_count}).",
         post,
     )

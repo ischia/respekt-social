@@ -6,7 +6,7 @@ přibývají komentáře**.
 
 Zpráva vypadá takhle:
 
-> 🚨 U příspěvku přibylo za poslední 2 hodiny 68 komentářů (aktuálně 251).
+> U příspěvku přibylo za poslední 2 hodiny 68 komentářů (aktuálně 251).
 > _V otázce migrace se i středové a proevropské strany dostaly do vleku
 > krajní pravice a její demagogie_
 > https://www.facebook.com/tydenikrespekt/posts/…

@@ -577,7 +577,7 @@ print("OK: selhání všech kanálů nezapíše cooldown")
 # unicode emoji (Slack shortcodes se v Chatu ani mailu nevykreslí)
 src = SCRIPT.read_text()
 assert ":rotating_light:" not in src and ":crescent_moon:" not in src
-assert "🚨" in src and "🌙" in src
+assert "🌙" in src
 print("OK: emoji jako znaky, ne slackové zkratky")
 
 print("\nVšechny testy prošly.")
