@@ -348,6 +348,14 @@ def webhook_json(url, payload, name):
     except urllib.error.URLError as e:
         print(f"{name} nedostupný: {e.reason}", file=sys.stderr)
         return False
+    except ValueError as e:
+        # Nevalidní URL (prázdný/poškozený secret) shodí Request() dřív, než
+        # se stihne pokusit o síťové spojení — HTTPError/URLError to
+        # nezachytí. Bez tohohle by pádem tohoto kanálu spadl celý běh a
+        # neuložil by se stav, takže by výpadek "zapomněl" i naměřené
+        # hodnoty za celou dobu, kdy secret chyběl.
+        print(f"{name} má nesprávně nastavenou URL ({url!r}): {e}", file=sys.stderr)
+        return False
 
     if status not in (200, 204):
         print(f"{name} vrátil status {status}: {body}", file=sys.stderr)
@@ -424,7 +432,16 @@ def deliver(sinks, text):
     """
     ok_any = False
     for name, send in sinks:
-        if send(text):
+        try:
+            ok = send(text)
+        except Exception as e:
+            # Poslední pojistka: ať selže kanál jakkoli neočekávaně (špatný
+            # secret, síťová knihovna, cokoli), nesmí to strhnout celý běh —
+            # jinak by se neuložil stav a výpadek jednoho kanálu by "smazal"
+            # i naměřená data za dobu, kdy byl rozbitý.
+            print(f"Kanál {name} spadl neočekávaně: {e}", file=sys.stderr)
+            ok = False
+        if ok:
             ok_any = True
         else:
             print(f"Kanál {name} zprávu nepřijal.", file=sys.stderr)

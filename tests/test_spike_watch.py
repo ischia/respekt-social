@@ -636,3 +636,45 @@ assert msg == "TITULEK\nhttps://fb.com/x", repr(msg)
 print("OK: skladba zprávy bez prázdných řádků")
 
 print("\nVšechny testy prošly.")
+
+# ==================== ODOLNOST PROTI ROZBITÉMU KANÁLU ====================
+print("\n--- rozbitý secret nesmí shodit běh ---")
+
+# malformovaná URL (prázdný/poškozený secret) shazuje Request() s ValueError
+# dřív, než se dostane k síti — tohle dřív propadlo až z main() jako pád
+fd, path = _tf.mkstemp(suffix=".json")
+os.close(fd)
+with open(path, "w") as f:
+    json.dump({"_meta": {"filter": "stream"},
+               "A": samples((6, 1000), (4, 1100), (2, 1200))}, f)
+
+watch.fetch_posts = lambda *a, **k: [post("A", 1251)]
+watch.http_post_json = lambda url, payload: (_ for _ in ()).throw(ValueError("unknown url type: ''"))
+
+os.environ.update(FB_PAGE_ID="1", FB_PAGE_ACCESS_TOKEN="t", STATE_FILE=path,
+                  WINDOW_HOURS="4", DELTA_THRESHOLD="100", QUIET_HOURS="",
+                  SLACK_WEBHOOK_URL="")
+try:
+    watch.main()
+    crashed = False
+except Exception:
+    crashed = True
+assert not crashed, "main() spadl místo aby zalogoval chybu kanálu"
+
+with open(path) as f:
+    st = json.load(f)
+os.unlink(path)
+assert "last_alert_ts" not in st["A"], st  # neuspělo, cooldown se nezapsal
+assert len(st["A"]["samples"]) == 4, st["A"]  # ale měření se přesto uložilo
+print("OK: nevalidní URL v secretu nezastaví běh a měření se uloží")
+
+# stejné pro sink, který spadne s úplně neočekávanou výjimkou
+sent = watch.deliver(
+    [("Rozbitý", lambda t: (_ for _ in ()).throw(RuntimeError("boom"))),
+     ("Funkční", lambda t: True)],
+    "test",
+)
+assert sent is True
+print("OK: neočekávaný pád jednoho kanálu nezabrání doručení přes druhý")
+
+print("\nVšechny testy prošly.")
