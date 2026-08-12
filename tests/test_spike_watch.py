@@ -295,29 +295,29 @@ print("OK: v noci se dál vzorkuje")
 
 print("\nVšechny testy prošly.")
 
-# ==================== VÝCHOZÍ HODNOTY (2h / 45) ====================
+# ==================== VÝCHOZÍ HODNOTY (2h / 25) ====================
 print("\n--- výchozí hodnoty ---")
 
-# 55 komentářů za 2h -> hlásit
+# 29 komentářů za 2h -> hlásit (namereny nejaktivnejsi prispevek bezneho dne)
 sent, _ = run(
-    [post("A", 55)],
+    [post("A", 29)],
     {"A": samples((3, 0), (2, 0), (1, 12))},
     defaults=True, QUIET_HOURS="",
 )
 assert len(sent) == 1, sent
 assert "za poslední 2 hodiny" in sent[0], sent[0]
-assert "55 komentářů" in sent[0], sent[0]
-print("OK: výchozí 2h/45 hlásí")
+assert "29 komentářů" in sent[0], sent[0]
+print("OK: výchozí 2h/25 hlásí")
 print("   zpráva:", sent[0].split("\n")[0])
 
-# 40 za 2h -> ticho
+# 16 za 2h -> ticho (namereny bezny provoz)
 sent, _ = run(
-    [post("B", 40)],
+    [post("B", 16)],
     {"B": samples((3, 0), (2, 0), (1, 10))},
     defaults=True, QUIET_HOURS="",
 )
 assert sent == [], sent
-print("OK: výchozí 2h/45 pod prahem mlčí")
+print("OK: výchozí 2h/25 pod prahem mlčí")
 
 # typický mrtvý příspěvek (90 % případů) nikdy nehlásí
 sent, state = run(
@@ -411,7 +411,7 @@ assert watch.required_delta(100, 60, 4 * H) == 50
 print("OK: výpočet poměrného prahu")
 
 # --- reálný případ: příspěvek z 8:25, běh v 9:42 (1h17m) ---
-# ve stream basis mel ~42 komentaru; poměrný práh = 45 * (77/120) = 28.9
+# ve stream basis mel ~42 komentaru; poměrný práh = 25 * (77/120) = 16.0
 sent, _ = run(
     [post("CEUTA", 42, age_hours=77 / 60)],
     {},
@@ -423,9 +423,9 @@ print("OK: reálný propadlý případ (28 komentářů za 1h17m) se nově zachy
 print("   zpráva:", sent[0].split("\n")[0])
 
 # --- ale pomalý rozjezd ve stejném věku ne ---
-# 25 komentářů za 1h17m: pod poměrným prahem 28.9
+# 14 komentářů za 1h17m: pod poměrným prahem 16.0
 sent, _ = run(
-    [post("POMALY", 25, age_hours=77 / 60)],
+    [post("POMALY", 14, age_hours=77 / 60)],
     {},
     defaults=True, QUIET_HOURS="",
 )
@@ -433,9 +433,9 @@ assert sent == [], sent
 print("OK: pomalý rozjezd ve stejném věku mlčí")
 
 # --- podlaha: pár komentářů hned po zveřejnění nedělá poplach ---
-# 20 komentářů za 3 minuty, podlaha je 22.5
+# 10 komentářů za 3 minuty, podlaha je 12.5
 sent, _ = run(
-    [post("CERSTVY", 20, age_hours=3 / 60)],
+    [post("CERSTVY", 10, age_hours=3 / 60)],
     {},
     defaults=True, QUIET_HOURS="",
 )

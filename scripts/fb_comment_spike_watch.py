@@ -4,7 +4,7 @@ FB Comment Spike Watch
 Sleduje příspěvky na FB stránce Respektu za posledních 7 dní a upozorňuje
 na Slacku, v Google Chatu nebo mailem, když příspěvku *přibude* za
 sledované okno (výchozí 2 hodiny)
-víc než daný počet komentářů (výchozí 45).
+víc než daný počet komentářů (výchozí 25).
 
 Hlídá se tedy rychlost přírůstku, ne absolutní počet: příspěvek, který
 nasbíral 300 komentářů rovnoměrně za týden, je nezajímavý; příspěvek,
@@ -26,7 +26,7 @@ Alespoň jeden kanál pro upozornění (dá se jich zapnout víc naráz):
 
 Volitelné:
     WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 2)
-    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 45)
+    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 25)
     COMMENT_FILTER          - "stream" (výchozí) počítá i odpovědi ve
                               vláknech, takže čísla sedí s Facebookem;
                               "toplevel" jen komentáře první úrovně
@@ -452,7 +452,7 @@ def main():
     page_id = env("FB_PAGE_ID", required=True)
     access_token = env("FB_PAGE_ACCESS_TOKEN", required=True)
     window_hours = int(env("WINDOW_HOURS", "2"))
-    threshold = int(env("DELTA_THRESHOLD", "45"))
+    threshold = int(env("DELTA_THRESHOLD", "25"))
     cooldown_hours = int(env("COOLDOWN_HOURS", str(window_hours)))
     lookback_days = int(env("LOOKBACK_DAYS", "7"))
     state_file = env("STATE_FILE", "state/fb_spike_state.json")

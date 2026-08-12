@@ -24,7 +24,7 @@ včas na to, aby se stihly moderovat.
 2. Aktuální počet zapíše do časové řady ve `state/fb_spike_state.json`.
 3. Spočítá **přírůstek za okno**: aktuální počet minus počet naměřený na
    začátku okna (výchozí 2 hodiny zpět).
-4. Když přírůstek překročí práh (výchozí 45), pošle upozornění do
+4. Když přírůstek překročí práh (výchozí 25), pošle upozornění do
    nastavených kanálů.
 5. Workflow commitne aktualizovaný stav zpátky do repa.
 
@@ -42,7 +42,7 @@ přibylo 150 za dopoledne, je událost.
   souhrn („Přes noc u příspěvku přibylo až N komentářů"). Bez toho by
   spike ze druhé hodiny ranní do rána vypadl z okna a zmizel.
 - **Noční eskalace.** Opravdu velký nápor – ve výchozím nastavení 3×
-  práh, tedy 90 komentářů za 2 hodiny (`NIGHT_ESCALATION_FACTOR`) – se
+  práh, tedy 75 komentářů za 2 hodiny (`NIGHT_ESCALATION_FACTOR`) – se
   ozve i v noci, protože pět hodin nemoderované diskuze napáchá víc škody
   než jedno probuzení. `NIGHT_ESCALATION_FACTOR=0` to vypne úplně.
 - **Čerstvé příspěvky.** Příspěvek mladší než okno má základnu 0, protože
@@ -151,7 +151,7 @@ Volitelné proměnné prostředí:
 | Proměnná | Výchozí | Popis |
 |---|---|---|
 | `WINDOW_HOURS` | `2` | délka okna pro měření přírůstku |
-| `DELTA_THRESHOLD` | `45` | kolik komentářů musí v okně přibýt |
+| `DELTA_THRESHOLD` | `25` | kolik komentářů musí v okně přibýt |
 | `COMMENT_FILTER` | `stream` | `stream` počítá i odpovědi ve vláknech (sedí s Facebookem), `toplevel` jen první úroveň |
 | `COOLDOWN_HOURS` | = `WINDOW_HOURS` | jak dlouho po notifikaci mlčet u téhož příspěvku |
 | `LOOKBACK_DAYS` | `7` | kolik dní zpět hledat příspěvky |
@@ -176,7 +176,7 @@ najednou. Skript si proto použitý způsob počítání ukládá do stavu a př
 změně historii zahodí a začne měřit znovu (první běh po přepnutí tedy
 nehlásí nic).
 
-### Proč zrovna 2 hodiny / 45 komentářů
+### Proč zrovna 2 hodiny / 25 komentářů
 
 Naměřeno na reálném týdnu: 80 příspěvků, medián 2 komentáře, třetina bez
 komentářů úplně. Nad 150 komentářů se dostalo šest příspěvků – a mezi nimi
@@ -186,8 +186,26 @@ citlivý, aniž by to začalo šumět. Zároveň to hlásí dost brzy na to, aby
 moderovat – konzervativnější „100 za 4 hodiny" se ozve, až když diskuze
 běží půl dne.
 
-Práh je 45 (ne 30), protože se počítají i odpovědi ve vláknech; v přepočtu
-na komentáře první úrovně to odpovídá zhruba původním 30.
+Práh 25 vychází z naměřeného provozu, ne z odhadu. Rozhodující je rozdíl
+mezi *celkovým počtem* komentářů a *rychlostí* jejich přibývání — příspěvek
+se 650 komentáři přidal za čtyři hodiny devět, zatímco skutečný nápor
+udělal 69 za dvě hodiny. Detekce cílí na to druhé.
+
+Naměřené hodnoty (přírůstek za 2h okno napříč všemi sledovanými příspěvky):
+
+| Přírůstek | Situace |
+|---|---|
+| +69 | skutečný výbuch, který chceme hlásit |
+| +29 | nejaktivnější příspěvek běžného dne |
+| +16 | běžný provoz, hlásit nechceme |
+
+Práh 25 tedy zachytí výbuch i výrazný nadprůměr, ale běžný provoz ne.
+Zvýšením na 45 se hlásí jen skutečné výbuchy (řádově jednotky za týden),
+snížením pod 20 to začne šumět.
+
+Pozor na past: příspěvek s vysokým *celkovým* počtem komentářů se nemusí
+ozvat nikdy, pokud je nabíral rovnoměrně přes celý den. To je záměr, ne
+chyba.
 
 Po týdnu provozu je vhodné čísla doladit podle toho, kolik notifikací
 reálně chodí.
