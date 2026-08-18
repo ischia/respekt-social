@@ -678,3 +678,39 @@ assert sent is True
 print("OK: neočekávaný pád jednoho kanálu nezabrání doručení přes druhý")
 
 print("\nVšechny testy prošly.")
+
+# ==================== ODKAZ NA PŘÍSPĚVEK ====================
+print("\n--- odkaz na příspěvek ---")
+
+P = {"id": "52479821102_1479160514249563",
+     "permalink_url": "https://www.facebook.com/1465630938935854/posts/1479160514249563"}
+
+# se jménem stránky se odkaz skládá z ID příspěvku
+assert watch.post_url(P, "tydenikrespekt") == (
+    "https://www.facebook.com/tydenikrespekt/posts/1479160514249563")
+print("OK: odkaz se skládá ze jména stránky a ID příspěvku")
+
+# bez jména zbývá permalink z Graph API
+assert watch.post_url(P, "") == P["permalink_url"]
+assert watch.post_url(P, None) == P["permalink_url"]
+print("OK: bez PAGE_SLUG se použije permalink_url")
+
+# ID bez podtržítka i chybějící ID nespadnou
+assert watch.post_url({"id": "123"}, "x") == "https://www.facebook.com/x/posts/123"
+assert watch.post_url({}, "x") == ""
+assert watch.post_url({"permalink_url": "https://fb.com/p"}, "") == "https://fb.com/p"
+print("OK: neobvyklý tvar ID nespadne")
+
+# celý běh: ve zprávě je nový tvar odkazu, ne ten z API
+sent, _ = run(
+    [{**post("52479821102_1479160514249563", 1251),
+      "permalink_url": "https://www.facebook.com/1465630938935854/posts/1479160514249563"}],
+    {"52479821102_1479160514249563": samples((6, 1000), (4, 1100), (2, 1200))},
+    PAGE_SLUG="tydenikrespekt",
+)
+assert "facebook.com/tydenikrespekt/posts/1479160514249563" in sent[0], sent[0]
+assert "1465630938935854" not in sent[0], sent[0]
+print("OK: zpráva nese odkaz se jménem stránky")
+print("   zpráva:", sent[0].split("\n")[-1])
+
+print("\nVšechny testy prošly.")

@@ -58,6 +58,10 @@ přibylo 150 za dopoledne, je událost.
   text"; šipka i zkrácený odkaz se z upozornění odloupnou (odkaz na
   příspěvek je ve zprávě už jednou) a zbude jen text, kurzívou. Když po
   očištění nic nezbude, řádek se vynechá.
+- **Odkaz na příspěvek** se skládá z `PAGE_SLUG` a ID příspěvku, tedy
+  `facebook.com/tydenikrespekt/posts/…`. Permalink z Graph API se
+  nepoužívá — nese jinou číselnou identitu stránky, než jaká je v ID
+  příspěvku, a nemusí se otevřít.
 - **První pozorování staršího příspěvku nehlásí** – není z čeho přírůstek
   počítat. Ozve se až při dalším běhu.
 - **Cooldown.** Po notifikaci se u téhož příspěvku mlčí po dobu
@@ -152,6 +156,7 @@ Volitelné proměnné prostředí:
 |---|---|---|
 | `WINDOW_HOURS` | `2` | délka okna pro měření přírůstku |
 | `DELTA_THRESHOLD` | `25` | kolik komentářů musí v okně přibýt |
+| `PAGE_SLUG` | `tydenikrespekt` | jméno stránky v odkazech (část za `facebook.com/`); prázdné = permalink z Graph API |
 | `COMMENT_FILTER` | `stream` | `stream` počítá i odpovědi ve vláknech (sedí s Facebookem), `toplevel` jen první úroveň |
 | `COOLDOWN_HOURS` | = `WINDOW_HOURS` | jak dlouho po notifikaci mlčet u téhož příspěvku |
 | `LOOKBACK_DAYS` | `7` | kolik dní zpět hledat příspěvky |

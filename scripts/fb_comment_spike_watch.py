@@ -27,6 +27,10 @@ Alespoň jeden kanál pro upozornění (dá se jich zapnout víc naráz):
 Volitelné:
     WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 2)
     DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 25)
+    PAGE_SLUG               - jméno stránky v odkazech, tedy část za
+                              facebook.com/ (výchozí tydenikrespekt).
+                              Prázdná hodnota = použije se permalink_url
+                              z Graph API.
     COMMENT_FILTER          - "stream" (výchozí) počítá i odpovědi ve
                               vláknech, takže čísla sedí s Facebookem;
                               "toplevel" jen komentáře první úrovně
@@ -270,6 +274,21 @@ def post_snippet(post, limit=160):
     return f"_{text}_"
 
 
+def post_url(post, page_slug):
+    """Odkaz na příspěvek.
+
+    Graph API vrací v permalink_url číselnou identitu stránky, která se
+    nemusí otevřít — Facebook má pro stránku víc číselných ID a to
+    v permalinku neodpovídá tomu z ID příspěvku. Se jménem stránky
+    (PAGE_SLUG) je odkaz spolehlivý i čitelný. Bez nastaveného jména
+    zbývá permalink_url.
+    """
+    story = (post.get("id") or "").rsplit("_", 1)[-1]
+    if page_slug and story:
+        return f"https://www.facebook.com/{page_slug}/posts/{story}"
+    return post.get("permalink_url", "")
+
+
 def compose(headline, post):
     """Zpráva = titulek, popisek příspěvku (když nějaký je) a odkaz."""
     parts = [headline, post_snippet(post), post.get("permalink_url", "")]
@@ -457,6 +476,7 @@ def main():
     lookback_days = int(env("LOOKBACK_DAYS", "7"))
     state_file = env("STATE_FILE", "state/fb_spike_state.json")
     comment_filter = env("COMMENT_FILTER", "stream")
+    page_slug = env("PAGE_SLUG", "tydenikrespekt")
     quiet_spec = env("QUIET_HOURS", "22-7")
     tz_name = env("TIMEZONE", "Europe/Prague")
     escalation_factor = float(env("NIGHT_ESCALATION_FACTOR", "3"))
@@ -481,6 +501,9 @@ def main():
         if not post_id:
             continue
         seen_ids.add(post_id)
+
+        # Odkaz si skládáme sami; permalink_url z Graph API se nemusí otevřít.
+        post["permalink_url"] = post_url(post, page_slug)
 
         comment_count = (
             post.get("comments", {}).get("summary", {}).get("total_count", 0)
