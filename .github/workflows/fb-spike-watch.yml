@@ -37,10 +37,10 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
-          # Ladicí parametry — po týdnu provozu je vhodné je upravit
-          # podle toho, kolik notifikací reálně chodí.
+          # Ladicí parametry — hodnoty vycházejí z měsíce provozu, viz README.
           WINDOW_HOURS: "2"       # v jak dlouhém okně se přírůstek měří
-          DELTA_THRESHOLD: "25"   # kolik komentářů v okně přibude = spike
+          DELTA_THRESHOLD: "35"   # kolik komentářů v okně přibude = spike
+          COOLDOWN_HOURS: "12"    # po notifikaci u téhož příspěvku mlčet
           COMMENT_FILTER: "stream"      # počítat i odpovědi ve vláknech
           PAGE_SLUG: "tydenikrespekt"   # jméno stránky v odkazech
           QUIET_HOURS: "22-7"     # noční klid (prázdné = vypnuto)

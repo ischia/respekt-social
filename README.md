@@ -24,7 +24,7 @@ včas na to, aby se stihly moderovat.
 2. Aktuální počet zapíše do časové řady ve `state/fb_spike_state.json`.
 3. Spočítá **přírůstek za okno**: aktuální počet minus počet naměřený na
    začátku okna (výchozí 2 hodiny zpět).
-4. Když přírůstek překročí práh (výchozí 25), pošle upozornění do
+4. Když přírůstek překročí práh (výchozí 35), pošle upozornění do
    nastavených kanálů.
 5. Workflow commitne aktualizovaný stav zpátky do repa.
 
@@ -42,7 +42,7 @@ přibylo 150 za dopoledne, je událost.
   souhrn („Přes noc u příspěvku přibylo až N komentářů"). Bez toho by
   spike ze druhé hodiny ranní do rána vypadl z okna a zmizel.
 - **Noční eskalace.** Opravdu velký nápor – ve výchozím nastavení 3×
-  práh, tedy 75 komentářů za 2 hodiny (`NIGHT_ESCALATION_FACTOR`) – se
+  práh, tedy 105 komentářů za 2 hodiny (`NIGHT_ESCALATION_FACTOR`) – se
   ozve i v noci, protože pět hodin nemoderované diskuze napáchá víc škody
   než jedno probuzení. `NIGHT_ESCALATION_FACTOR=0` to vypne úplně.
 - **Čerstvé příspěvky.** Příspěvek mladší než okno má základnu 0, protože
@@ -65,8 +65,8 @@ přibylo 150 za dopoledne, je událost.
 - **První pozorování staršího příspěvku nehlásí** – není z čeho přírůstek
   počítat. Ozve se až při dalším běhu.
 - **Cooldown.** Po notifikaci se u téhož příspěvku mlčí po dobu
-  `COOLDOWN_HOURS` (výchozí = délka okna), aby jedna vášnivá diskuze
-  nehlásila každou hodinu.
+  `COOLDOWN_HOURS` (výchozí 12 h), aby jedna vášnivá diskuze nehlásila
+  pořád dokola. Je záměrně mnohem delší než okno měření — viz níž.
 - **Selhání kanálu** neshodí běh. Když neuspěje ani jeden, cooldown se
   nezapíše a příští běh to zkusí znovu, místo aby se spike tiše ztratil.
 - **Úklid.** Příspěvky, které vypadnou ze 7denního okna, se ze stavového
@@ -155,10 +155,10 @@ Volitelné proměnné prostředí:
 | Proměnná | Výchozí | Popis |
 |---|---|---|
 | `WINDOW_HOURS` | `2` | délka okna pro měření přírůstku |
-| `DELTA_THRESHOLD` | `25` | kolik komentářů musí v okně přibýt |
+| `DELTA_THRESHOLD` | `35` | kolik komentářů musí v okně přibýt |
 | `PAGE_SLUG` | `tydenikrespekt` | jméno stránky v odkazech (část za `facebook.com/`); prázdné = permalink z Graph API |
 | `COMMENT_FILTER` | `stream` | `stream` počítá i odpovědi ve vláknech (sedí s Facebookem), `toplevel` jen první úroveň |
-| `COOLDOWN_HOURS` | = `WINDOW_HOURS` | jak dlouho po notifikaci mlčet u téhož příspěvku |
+| `COOLDOWN_HOURS` | `12` | jak dlouho po notifikaci mlčet u téhož příspěvku |
 | `LOOKBACK_DAYS` | `7` | kolik dní zpět hledat příspěvky |
 | `QUIET_HOURS` | `22-7` | noční klid, prázdná hodnota = vypnuto |
 | `TIMEZONE` | `Europe/Prague` | zóna, podle které se počítá noční klid |
@@ -181,7 +181,27 @@ najednou. Skript si proto použitý způsob počítání ukládá do stavu a př
 změně historii zahodí a začne měřit znovu (první běh po přepnutí tedy
 nehlásí nic).
 
-### Proč zrovna 2 hodiny / 25 komentářů
+### Práh a cooldown: dvě různé páky
+
+Měsíc ostrého provozu ukázal, že objem notifikací nedělá práh, ale
+**opakování u téhož příspěvku**. Při prahu 25 a cooldownu 2 h odešlo za
+21 dní 135 notifikací, ale jen pro 36 různých příspěvků — skoro 4 zprávy
+na jeden. Jeden příspěvek se ozval 22× za tři dny. Zvýšení prahu s tím
+skoro nehnulo (45 dávalo 5,8 zprávy denně, 25 pak 6,4).
+
+Simulace nad naměřenými daty (21 dní):
+
+| Práh | Cooldown | Denně | Různých příspěvků | Zpráv na příspěvek |
+|---|---|---|---|---|
+| 25 | 2 h | 6,1 | 32 | 4,0 |
+| 25 | 12 h | 2,3 | 32 | 1,5 |
+| **35** | **12 h** | **1,4** | **23** | **1,3** |
+| 45 | 12 h | 1,0 | 16 | 1,4 |
+
+Práh tedy řídí, **které** příspěvky se hlásí; cooldown, **kolikrát** se
+ozve každý z nich. Nastavené 35 / 12 h vychází na ~1,4 zprávy denně.
+
+### Proč zrovna 2 hodiny
 
 Naměřeno na reálném týdnu: 80 příspěvků, medián 2 komentáře, třetina bez
 komentářů úplně. Nad 150 komentářů se dostalo šest příspěvků – a mezi nimi
@@ -204,9 +224,7 @@ Naměřené hodnoty (přírůstek za 2h okno napříč všemi sledovanými pří
 | +29 | nejaktivnější příspěvek běžného dne |
 | +16 | běžný provoz, hlásit nechceme |
 
-Práh 25 tedy zachytí výbuch i výrazný nadprůměr, ale běžný provoz ne.
-Zvýšením na 45 se hlásí jen skutečné výbuchy (řádově jednotky za týden),
-snížením pod 20 to začne šumět.
+Práh 35 se hlásí ~8 příspěvků týdně; při 45 je to ~5 týdně, při 25 ~11.
 
 Pozor na past: příspěvek s vysokým *celkovým* počtem komentářů se nemusí
 ozvat nikdy, pokud je nabíral rovnoměrně přes celý den. To je záměr, ne

@@ -4,7 +4,7 @@ FB Comment Spike Watch
 Sleduje příspěvky na FB stránce Respektu za posledních 7 dní a upozorňuje
 na Slacku, v Google Chatu nebo mailem, když příspěvku *přibude* za
 sledované okno (výchozí 2 hodiny)
-víc než daný počet komentářů (výchozí 25).
+víc než daný počet komentářů (výchozí 35).
 
 Hlídá se tedy rychlost přírůstku, ne absolutní počet: příspěvek, který
 nasbíral 300 komentářů rovnoměrně za týden, je nezajímavý; příspěvek,
@@ -26,7 +26,7 @@ Alespoň jeden kanál pro upozornění (dá se jich zapnout víc naráz):
 
 Volitelné:
     WINDOW_HOURS            - délka okna pro měření přírůstku (výchozí 2)
-    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 25)
+    DELTA_THRESHOLD         - kolik komentářů musí v okně přibýt (výchozí 35)
     PAGE_SLUG               - jméno stránky v odkazech, tedy část za
                               facebook.com/ (výchozí tydenikrespekt).
                               Prázdná hodnota = použije se permalink_url
@@ -35,7 +35,9 @@ Volitelné:
                               vláknech, takže čísla sedí s Facebookem;
                               "toplevel" jen komentáře první úrovně
     COOLDOWN_HOURS          - jak dlouho po notifikaci mlčet u téhož
-                              příspěvku (výchozí = WINDOW_HOURS)
+                              příspěvku (výchozí 12). Řídí, kolikrát se
+                              ozve jeden příspěvek; práh řídí, které
+                              příspěvky se hlásí.
     LOOKBACK_DAYS           - kolik dní zpět hledat příspěvky (výchozí 7)
     QUIET_HOURS             - noční klid ve tvaru "22-7" (výchozí), prázdná
                               hodnota = vypnuto. V klidu se dál měří, jen se
@@ -471,8 +473,8 @@ def main():
     page_id = env("FB_PAGE_ID", required=True)
     access_token = env("FB_PAGE_ACCESS_TOKEN", required=True)
     window_hours = int(env("WINDOW_HOURS", "2"))
-    threshold = int(env("DELTA_THRESHOLD", "25"))
-    cooldown_hours = int(env("COOLDOWN_HOURS", str(window_hours)))
+    threshold = int(env("DELTA_THRESHOLD", "35"))
+    cooldown_hours = int(env("COOLDOWN_HOURS", "12"))
     lookback_days = int(env("LOOKBACK_DAYS", "7"))
     state_file = env("STATE_FILE", "state/fb_spike_state.json")
     comment_filter = env("COMMENT_FILTER", "stream")
@@ -550,8 +552,10 @@ def main():
         if delta <= required_delta(threshold, elapsed, window_seconds):
             continue
 
-        # Prudká diskuze běží klidně půl dne; bez cooldownu by hlásila
-        # při každém běhu znovu.
+        # Prudká diskuze hoří klidně dva dny. S krátkým cooldownem se týž
+        # příspěvek hlásí pořád dokola — v ostrém provozu vyšlo 135 notifikací
+        # na 36 příspěvků, jeden se ozval 22× za tři dny. Proto je cooldown
+        # výrazně delší než okno měření.
         last_alert = entry.get("last_alert_ts", 0)
         if now - last_alert < cooldown_hours * 3600:
             continue
