@@ -33,6 +33,7 @@ img { max-width: 100%; height: auto; display: block; }
 .hero { background: var(--soft); padding: 48px 0; }
 .hero .wrap { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: start; }
 .hero-image img { width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.hero-caption { font: 13px/1.5 var(--sans); color: var(--muted); margin: 12px 0 0; max-width: 300px; }
 .hero h1 { font: 800 clamp(36px, 6vw, 64px)/1.05 var(--sans); text-transform: uppercase; margin: 0 0 24px; letter-spacing: -1px; }
 .hero h1 span { color: var(--red); }
 .hero p { margin: 0 0 16px; }
@@ -41,7 +42,7 @@ img { max-width: 100%; height: auto; display: block; }
 .hero blockquote { margin: 0 0 6px; font-style: italic; color: var(--muted); }
 
 .covers { padding: 32px 0; border-bottom: 1px solid var(--line); }
-.covers .strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.covers .strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
 .covers img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
 
 main .wrap { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 48px; padding-top: 40px; padding-bottom: 64px; }
@@ -95,7 +96,8 @@ footer a { color: #fff; }
 
 <section class="hero">
   <div class="wrap">
-    <div class="hero-image"><img src="img/cover-2011-special.jpg" alt="Mimořádné vydání Respektu: Václav Havel 1936–2011"></div>
+    <div class="hero-image"><a href="https://www.respekt.cz/tydenik/2026/41"><img src="img/cover-2026-41.jpg" alt="Obálka Respektu 41/2026: Opět strašně aktuální Havel"></a>
+      <p class="hero-caption">Aktuální číslo 41/2026: <a href="https://www.respekt.cz/tydenik/2026/41">Opět strašně aktuální Havel</a><br>Ilustrace: Dana Lédl</p></div>
     <div>
       <h1><span>90 let</span> s Havlem</h1>
       <p>Vzpomínat na lidi, kteří vykonali něco výjimečného, se má proto, abychom si připomněli, v čem ta výjimečnost spočívala, ne proto, abychom truchlili, že už nám nemohou pomoci. U Václava Havla to platí bezezbytku. Udělal maximum, aby zdejší společnost měla lepší budoucnost.</p>
@@ -115,7 +117,7 @@ footer a { color: #fff; }
 </section>
 
 <section class="covers" aria-label="Václav Havel na obálkách Respektu">
-  <div class="wrap"><div class="strip"><img src="img/cover-1991-09.jpg" alt="Obálka Respektu 9/1991" loading="lazy"><img src="img/cover-1991-39.jpg" alt="Obálka Respektu 39/1991" loading="lazy"><img src="img/cover-1997-04.jpg" alt="Obálka Respektu 4/1997" loading="lazy"><img src="img/cover-2009-47.jpg" alt="Obálka Respektu 47/2009" loading="lazy"><img src="img/cover-2014-50.jpg" alt="Obálka Respektu 50/2014" loading="lazy"><img src="img/cover-2015-24.jpg" alt="Obálka Respektu 24/2015" loading="lazy"><img src="img/cover-2016-39.jpg" alt="Obálka Respektu 39/2016" loading="lazy"></div></div>
+  <div class="wrap"><div class="strip"><img src="img/cover-1991-09.jpg" alt="Obálka Respektu 9/1991" loading="lazy"><img src="img/cover-1991-39.jpg" alt="Obálka Respektu 39/1991" loading="lazy"><img src="img/cover-1997-04.jpg" alt="Obálka Respektu 4/1997" loading="lazy"><img src="img/cover-2009-47.jpg" alt="Obálka Respektu 47/2009" loading="lazy"><img src="img/cover-2011-special.jpg" alt="Obálka Respektu speciál 2011" loading="lazy"><img src="img/cover-2014-50.jpg" alt="Obálka Respektu 50/2014" loading="lazy"><img src="img/cover-2015-24.jpg" alt="Obálka Respektu 24/2015" loading="lazy"><img src="img/cover-2016-39.jpg" alt="Obálka Respektu 39/2016" loading="lazy"></div></div>
 </section>
 
 <main>
