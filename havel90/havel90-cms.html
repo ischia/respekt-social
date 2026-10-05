@@ -19,14 +19,14 @@
 .havel90 * { box-sizing: border-box; }
 .havel90 { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--serif); }
 /* roztažení přes celou šířku okna i z užšího sloupce CMS */
-.havel90 { position: relative; width: calc(100vw - var(--havel90-sb, 0px)); left: 50%; margin-left: calc((100vw - var(--havel90-sb, 0px)) / -2); max-width: none; }
+.havel90 { position: relative; max-width: none; }
 .havel90 a { color: var(--red); text-decoration: none; }
 .havel90 a:hover { text-decoration: underline; }
 .havel90 img { max-width: 100%; height: auto; display: block; }
 .havel90 .wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
 .havel90 .hero { background: var(--bg); padding: 48px 0; }
 .havel90 .hero .wrap { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: stretch; }
-.havel90 .hero-image { position: sticky; top: 24px; }
+.havel90 .hero-image { position: sticky; top: 24px; align-self: start; }
 .havel90 .hero-image img { width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
 .havel90 .hero-caption { font: 13px/1.5 var(--sans); color: var(--muted); margin: 0; padding-top: 20px; max-width: 300px; }
 .havel90 .hero h1 { font: 800 clamp(36px, 6vw, 64px)/1.05 var(--sans); text-transform: uppercase; margin: 0 0 24px; letter-spacing: -1px; }
@@ -171,8 +171,19 @@
 
 <script>
 (function () {
-  function sb() { document.documentElement.style.setProperty('--havel90-sb', (window.innerWidth - document.documentElement.clientWidth) + 'px'); }
-  sb(); window.addEventListener('resize', sb);
+  // roztáhne komponentu přes celou šířku okna podle skutečné polohy sloupce CMS
+  var el = document.querySelector('.havel90');
+  if (!el || !el.parentElement) return;
+  function fit() {
+    el.style.marginLeft = '0px';
+    el.style.width = '';
+    var left = el.parentElement.getBoundingClientRect().left + (parseFloat(getComputedStyle(el.parentElement).paddingLeft) || 0);
+    el.style.marginLeft = (-left) + 'px';
+    el.style.width = document.documentElement.clientWidth + 'px';
+  }
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('load', fit);
 })();
 document.querySelectorAll('.havel90 .carousel').forEach(function (box) {
   var strip = box.querySelector('.strip');
