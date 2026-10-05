@@ -34,6 +34,14 @@ img { max-width: 100%; height: auto; display: block; }
 .hero .wrap { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: start; }
 .hero-image img { width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
 .hero-caption { font: 13px/1.5 var(--sans); color: var(--muted); margin: 12px 0 0; max-width: 300px; }
+.kicker { font: 700 12px/1.4 var(--sans); text-transform: uppercase; letter-spacing: .6px; color: var(--red); margin: 0 0 6px; }
+.byline { font: 600 13px/1.4 var(--sans); color: var(--muted); text-transform: uppercase; letter-spacing: .3px; margin: 0 0 12px; }
+.lead-article h2 { font-size: 30px; margin: 0 0 6px; }
+.lead-article h2 a, .editorial h3 a { color: var(--ink); }
+.perex { font-weight: 700; }
+.more { font: 700 14px var(--sans); }
+.editorial { border-left: 4px solid var(--red); padding: 4px 0 4px 20px; margin: 0 0 32px; }
+.editorial h3 { font-size: 22px; margin: 0 0 6px; }
 .hero h1 { font: 800 clamp(36px, 6vw, 64px)/1.05 var(--sans); text-transform: uppercase; margin: 0 0 24px; letter-spacing: -1px; }
 .hero h1 span { color: var(--red); }
 .hero p { margin: 0 0 16px; }
@@ -110,9 +118,14 @@ footer a { color: #fff; }
       <p class="hero-caption">Aktuální číslo 41/2026: <a href="https://www.respekt.cz/tydenik/2026/41">Opět strašně aktuální Havel</a><br>Ilustrace: Dana Lédl</p></div>
     <div>
       <h1><span>90 let</span> s Havlem</h1>
-      <p>Vzpomínat na lidi, kteří vykonali něco výjimečného, se má proto, abychom si připomněli, v čem ta výjimečnost spočívala, ne proto, abychom truchlili, že už nám nemohou pomoci. U Václava Havla to platí bezezbytku. Udělal maximum, aby zdejší společnost měla lepší budoucnost.</p>
-      <p>Václav Havel nám chybí tak, jako nám chybí každý aktivní a chytrý člověk. Jeho idea svobodné a otevřené společnosti však žije dál.</p>
-      <p>Letos si připomínáme nejen <a href="https://www.respekt.cz/tydenik/2016/39/pravda-a-laska-slavi-osmdesatku">90 let od narození</a>, ale také 15 let od prezidentovy smrti. Tento speciál nejzásadnějších textů, fotografií a ilustrací Respektu je naší drobnou vzpomínkou.</p>
+      <div class="lead-article">
+        <p class="kicker">Z aktuálního čísla 41/2026</p>
+        <h2><a href="https://www.respekt.cz/tydenik/2026/41/opet-strasne-aktualni-havel">Opět strašně aktuální Havel</a></h2>
+        <p class="byline">Marek Švehla</p>
+        <p class="perex">Nejvýznamnější Čech naší doby by oslavil 90. narozeniny. Jak se bez něj žije jeho přátelům?</p>
+        <p>Thunovská ulice na pražské Malé Straně stoupá prudce vzhůru a končí u schodů vedoucích nahoru na Hrad. V zářijovém úterý se dá tedy spolehnout, že provoz tu zajišťují jen skupinky šourajících se turistů. Venkovní dveře jednoho ze starých domů ovšem nejsou otevřené pro ně. Vedou do temné chodby a pak do přízemní místnosti, kde má rozlehlou pracovnu jedna z nejznámějších tváří nedávno zavřené Knihovny Václava Havla, spisovatel Jáchym Topol.</p>
+        <p class="more"><a href="https://www.respekt.cz/tydenik/2026/41/opet-strasne-aktualni-havel">Číst celý článek →</a></p>
+      </div>
       <ul>
         <li><a href="https://www.respekt.cz/tydenik/2016/39/manual-pro-budoucnost">Esej Martina M. Šimečky: Příběh Václava Havla nevypráví jen o naší společné minulosti, ale také nabízí průvodce pro dny příští</a></li>
         <li><a href="https://www.respekt.cz/tydenik/2016/39/kazdy-mame-sveho-havla">Nejtěžší okamžiky – rozhovor s tajemníkem Vladimírem Hanzelem</a></li>
@@ -145,6 +158,15 @@ footer a { color: #fff; }
       <ul class="special"><li><a href="https://www.respekt.cz/tydenik/2011/53/odkaz-vaclava-havla"><strong>Odkaz Václava Havla</strong><span class="author">Erik Tabery</span><span class=perex>Až odezní smutek, přijde čas hledat inspiraci</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/strucny-navod-jak-se-stat-nejdulezitejsi-osobnosti-sve-zeme"><strong>Stručný návod, jak se stát nejdůležitější osobností své země</strong><span class="author">Petr Třešňák, Tereza Brdečková, Marek Švehla</span><span class=perex>Před dvěma lety zemřel prezident Václav Havel</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/pravda-a-laska-atd-je-jako-slogan-moc-slozite"><strong>Pravda a láska atd. je jako slogan moc složité</strong><span class="author">Marek Švehla</span><span class=perex>Novinář, překladatel a zpěvák Plastic People Paul Wilson o dopisech, na které čekal 2 měsíce</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/reziser-hry-jez-zmenila-dejiny"><strong>Režisér hry, jež změnila dějiny</strong><span class="author">Timothy Garton Ash</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/vaclave-havle-bylo-to-skvele"><strong>Václave Havle, bylo to skvělé!</strong><span class="author">György Konrád</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/spolecnost-nevi-co-se-mnou"><strong>Společnost neví, co se mnou</strong><span class="author">Respekt</span><span class=perex>Během uplynulých dvaceti let vyšel v Respektu tucet rozhovorů s Václavem Havlem. Polovina z nich pak v době, která byla poprezidentská, a tudíž bilanční. Právě z těchto šesti interview přinášíme výběr.</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/zhaslo-srdce-na-hrade"><strong>Zhaslo srdce na Hradě</strong><span class="author">Erik Tabery, Marek Švehla</span><span class=perex>Jaké bylo prezidentství Václava Havla</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/do-posledni-chvile-prezident"><strong>Do poslední chvíle prezident</strong><span class="author">Silvie Lauder</span><span class=perex>Život Václava Havla v podhradí</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/cesta-snu"><strong>Cesta snů</strong><span class="author">Petr Třešňák</span><span class=perex>Vzpomínka na první státní návštěvu prezidenta Václava Havla v USA, která vrátila Československo na mapu svobodného světa</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/s-madeleine-v-rodine"><strong>S Madeleine v rodině</strong><span class="author">Ondřej Kundra, Silvie Lauder</span><span class=perex>Havlova globální přátelství a vřelé vztahy</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/usinali-jsme-spolecne"><strong>Usínali jsme společně</strong><span class="author">Petr Třešňák</span><span class=perex>Andrej Krob je režisér, který se svým Divadlem Na tahu inscenoval nejvíc Havlových her a patřil také k prezidentovým nejbližším přátelům. Oba sousedi z Hrádečku spolu trávili mnoho času i v posledních měsících.</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/vudce-odchazi"><strong>Vůdce odchází</strong><span class="author">Ferdinand Peroutka, 1935</span><span class=perex>Když T. G. Masaryk opouštěl prezidentský post, napsal o něm Ferdinand Peroutka pro svou Přítomnost článek, který ve většině argumentů pozoruhodně platí i na Václava Havla.</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/zahada-jednoho-faxu"><strong>Záhada jednoho faxu</strong><span class="author">Respekt</span></a></li></ul>
 
       <section class="gallery" id="foto-jaros"><h3>Rozloučení s Václavem Havlem pohledem fotografa Milana Jaroše</h3><p class="credit">Foto: Milan Jaroš</p><div class="grid"><figure><a href="img/g1-42986740_01.jpg" target="_blank" rel="noopener"><img src="img/g1-42986740_01-t.jpg" alt="Václav Havel – fotografie 1" loading="lazy"></a></figure><figure><a href="img/g1-42986770_02.jpg" target="_blank" rel="noopener"><img src="img/g1-42986770_02-t.jpg" alt="Václav Havel – fotografie 2" loading="lazy"></a></figure><figure><a href="img/g1-42986830_04.jpg" target="_blank" rel="noopener"><img src="img/g1-42986830_04-t.jpg" alt="Václav Havel – fotografie 3" loading="lazy"></a></figure><figure><a href="img/g1-42986870_05.jpg" target="_blank" rel="noopener"><img src="img/g1-42986870_05-t.jpg" alt="Václav Havel – fotografie 4" loading="lazy"></a></figure></div><details><summary>Celá fotogalerie (7 snímků)</summary><div class="grid"><figure><a href="img/g1-42986900_06.jpg" target="_blank" rel="noopener"><img src="img/g1-42986900_06-t.jpg" alt="Václav Havel – fotografie 5" loading="lazy"></a></figure><figure><a href="img/g1-42986940_07.jpg" target="_blank" rel="noopener"><img src="img/g1-42986940_07-t.jpg" alt="Václav Havel – fotografie 6" loading="lazy"></a></figure><figure><a href="img/g1-42986970_08.jpg" target="_blank" rel="noopener"><img src="img/g1-42986970_08-t.jpg" alt="Václav Havel – fotografie 7" loading="lazy"></a></figure></div></details></section>
+
+      <section class="editorial">
+        <p class="kicker">Respekt 39/2016</p>
+        <h3><a href="https://www.respekt.cz/tydenik/2016/39/pravda-a-laska-slavi-osmdesatku">Pravda a láska slaví osmdesátku</a></h3>
+        <p class="byline">Erik Tabery</p>
+        <p>Vzpomínat na lidi, kteří vykonali něco výjimečného, se má proto, abychom si připomněli, v čem ta výjimečnost spočívala, ne proto, abychom truchlili, že už nám nemohou pomoci. U Václava Havla to platí bezezbytku. Udělal maximum, aby zdejší společnost měla lepší budoucnost, nicméně i za jeho prezidentského úřadování to bylo hlavně na nás.</p>
+        <p>Václav Havel nám chybí tak, jako nám chybí každý aktivní a chytrý člověk. Jeho idea svobodné a otevřené společnosti však žije dál.</p>
+        <p class="more"><a href="https://www.respekt.cz/tydenik/2016/39/pravda-a-laska-slavi-osmdesatku">Číst celý text →</a></p>
+      </section>
 
       <ul class="links">
         <li><a href="https://www.respekt.cz/tydenik/2011/53/strucny-navod-jak-se-stat-nejdulezitejsi-osobnosti-sve-zeme">Stručný návod, jak se stát nejdůležitější osobností své země</a></li>
