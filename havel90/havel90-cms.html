@@ -49,8 +49,8 @@
 .havel90 .carousel-btn:hover { background: var(--red); border-color: var(--red); color: #fff; }
 .havel90 .carousel-btn:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
 .havel90 .carousel-btn[disabled] { opacity: 0; pointer-events: none; }
-.havel90 .carousel-prev { left: -4px; }
-.havel90 .carousel-next { right: -4px; }
+.havel90 .carousel-prev { left: 4px; }
+.havel90 .carousel-next { right: 4px; }
 .havel90 .covers img { box-shadow: 0 2px 6px rgba(0,0,0,.15); }
 .havel90 .main .wrap { max-width: 860px; padding-top: 40px; padding-bottom: 40px; }
 .havel90 .main { border-bottom: 1px solid var(--line); }
@@ -175,11 +175,19 @@
   var el = document.querySelector('.havel90');
   if (!el || !el.parentElement) return;
   function fit() {
+    var cw = document.documentElement.clientWidth;
+    el.style.width = cw + 'px';
+    el.style.maxWidth = 'none';
     el.style.marginLeft = '0px';
-    el.style.width = '';
-    var left = el.parentElement.getBoundingClientRect().left + (parseFloat(getComputedStyle(el.parentElement).paddingLeft) || 0);
-    el.style.marginLeft = (-left) + 'px';
-    el.style.width = document.documentElement.clientWidth + 'px';
+    el.style.marginRight = '0px';
+    // změří skutečnou polohu a dorovná ji k levému okraji okna (i u flex/grid/auto okrajů)
+    var ml = 0;
+    for (var i = 0; i < 3; i++) {
+      var left = el.getBoundingClientRect().left;
+      if (Math.abs(left) < 0.5) break;
+      ml -= left;
+      el.style.marginLeft = ml + 'px';
+    }
   }
   fit();
   window.addEventListener('resize', fit);
