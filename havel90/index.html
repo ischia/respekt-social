@@ -33,9 +33,10 @@ img { max-width: 100%; height: auto; display: block; }
 .topbar .btn { font: 600 14px var(--sans); background: var(--red); color: #fff; padding: 8px 14px; border-radius: 3px; }
 
 .hero { background: var(--soft); padding: 48px 0; }
-.hero .wrap { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: start; }
+.hero .wrap { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: stretch; }
+.hero-image { position: sticky; top: 24px; }
 .hero-image img { width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
-.hero-caption { font: 13px/1.5 var(--sans); color: var(--muted); margin: 12px 0 0; max-width: 300px; }
+.hero-caption { font: 13px/1.5 var(--sans); color: var(--muted); margin: 0; padding-top: 20px; max-width: 300px; }
 .hero h1 { font: 800 clamp(36px, 6vw, 64px)/1.05 var(--sans); text-transform: uppercase; margin: 0 0 24px; letter-spacing: -1px; }
 .hero h1 span { color: var(--red); }
 .hero p { margin: 0 0 16px; }
@@ -45,18 +46,25 @@ img { max-width: 100%; height: auto; display: block; }
 
 .covers { padding: 32px 0; border-bottom: 1px solid var(--line); }
 .carousel { position: relative; }
-.covers .strip { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; padding: 4px 0 8px; }
-.covers .strip::-webkit-scrollbar { display: none; }
-.covers .strip img { flex: none; width: calc((100% - 3 * 20px) / 4); scroll-snap-align: start; }
+.carousel .strip { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; padding: 4px 0 8px; }
+.carousel .strip::-webkit-scrollbar { display: none; }
+.covers h2 { margin-bottom: 20px; }
+.covers .strip img { flex: none; height: 380px; width: auto; scroll-snap-align: start; }
 .carousel-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(26,26,26,.75); color: #fff; font: 22px/40px var(--sans); cursor: pointer; z-index: 1; }
 .carousel-btn:hover { background: var(--red); }
 .carousel-btn[disabled] { opacity: 0; pointer-events: none; }
 .carousel-prev { left: -8px; }
 .carousel-next { right: -8px; }
-.covers img { height: auto; align-self: flex-end; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.covers img { box-shadow: 0 2px 6px rgba(0,0,0,.15); }
 
-main .wrap { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 48px; padding-top: 40px; padding-bottom: 64px; }
-aside h2 { font-size: 22px; }
+main .wrap { max-width: 860px; padding-top: 40px; padding-bottom: 64px; }
+.special-cover { float: right; width: 260px; margin: 4px 0 16px 28px; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.special { clear: both; }
+.quote { margin: 24px 0; padding: 4px 0 4px 24px; border-left: 4px solid var(--red); font-style: italic; }
+.quote p { margin: 0 0 8px; }
+.quote cite { font: 600 13px var(--sans); font-style: normal; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); }
+.quote cite::before { content: "— "; }
+.illustrations { margin: 0 0 40px; }
 h2 { font: 800 28px/1.2 var(--sans); margin: 0 0 20px; }
 h3 { font: 700 20px/1.3 var(--sans); margin: 0 0 16px; }
 .lead-img { margin: 24px 0; }
@@ -82,17 +90,19 @@ summary { cursor: pointer; display: block; text-align: center; font: 600 14px va
 summary::-webkit-details-marker { display: none; }
 details[open] summary { background: var(--red); border-color: var(--red); color: #fff; }
 
-.illus { display: grid; gap: 20px; }
-.illus img { background: #fff; aspect-ratio: auto; object-fit: contain; }
+.illus figure { flex: none; width: calc((100% - 2 * 20px) / 3); scroll-snap-align: start; }
+.illus img { width: 100%; height: 260px; aspect-ratio: auto; object-fit: contain; background: #fff; }
 
 footer { background: var(--ink); color: #bbb; font: 13px/1.6 var(--sans); padding: 32px 0; }
 footer a { color: #fff; }
 
 @media (max-width: 900px) {
-  .hero .wrap, main .wrap { grid-template-columns: 1fr; }
-  .illus { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .hero .wrap { grid-template-columns: 1fr; }
+  .hero-image { position: static; }
+  .illus figure { width: calc((100% - 20px) / 1.6); }
+  .special-cover { width: 160px; margin-left: 16px; }
   .hero-image img { width: 220px; }
-  .covers .strip img { width: calc((100% - 20px) / 1.6); }
+  .covers .strip img { height: 300px; }
   .carousel-btn { display: none; }
 }
 </style>
@@ -128,10 +138,11 @@ footer a { color: #fff; }
   </div>
 </section>
 
-<section class="covers" aria-label="Václav Havel na obálkách Respektu">
+<section class="covers">
+  <div class="wrap"><h2>Titulní strany Respektu</h2></div>
   <div class="wrap carousel">
     <button class="carousel-btn carousel-prev" type="button" aria-label="Předchozí obálky">‹</button>
-    <div class="strip"><img src="img/cover-1991-09.jpg" alt="Obálka Respektu 9/1991" loading="lazy"><img src="img/cover-1991-39.jpg" alt="Obálka Respektu 39/1991" loading="lazy"><img src="img/cover-1997-04.jpg" alt="Obálka Respektu 4/1997" loading="lazy"><img src="img/cover-2004-47.jpg" alt="Obálka Respektu 47/2004" loading="lazy"><img src="img/cover-2006-40.jpg" alt="Obálka Respektu 40/2006" loading="lazy"><img src="img/cover-2009-47.jpg" alt="Obálka Respektu 47/2009" loading="lazy"><img src="img/cover-2011-special.jpg" alt="Obálka Respektu speciál 2011" loading="lazy"><img src="img/cover-2013-21.jpg" alt="Obálka Respektu 21/2013" loading="lazy"><img src="img/cover-2013-28.jpg" alt="Obálka Respektu 28/2013" loading="lazy"><img src="img/cover-2014-50.jpg" alt="Obálka Respektu 50/2014" loading="lazy"><img src="img/cover-2015-24.jpg" alt="Obálka Respektu 24/2015" loading="lazy"><img src="img/cover-2016-39.jpg" alt="Obálka Respektu 39/2016" loading="lazy"></div>
+    <div class="strip"><img src="img/cover-1991-09.jpg" alt="Obálka Respektu 9/1991" loading="lazy"><img src="img/cover-1991-39.jpg" alt="Obálka Respektu 39/1991" loading="lazy"><img src="img/cover-1997-04.jpg" alt="Obálka Respektu 4/1997" loading="lazy"><img src="img/cover-2004-47.jpg" alt="Obálka Respektu 47/2004" loading="lazy"><img src="img/cover-2006-40.jpg" alt="Obálka Respektu 40/2006" loading="lazy"><img src="img/cover-2009-47.jpg" alt="Obálka Respektu 47/2009" loading="lazy"><img src="img/cover-2013-21.jpg" alt="Obálka Respektu 21/2013" loading="lazy"><img src="img/cover-2013-28.jpg" alt="Obálka Respektu 28/2013" loading="lazy"><img src="img/cover-2014-50.jpg" alt="Obálka Respektu 50/2014" loading="lazy"><img src="img/cover-2015-24.jpg" alt="Obálka Respektu 24/2015" loading="lazy"><img src="img/cover-2016-39.jpg" alt="Obálka Respektu 39/2016" loading="lazy"></div>
     <button class="carousel-btn carousel-next" type="button" aria-label="Další obálky">›</button>
   </div>
 </section>
@@ -140,16 +151,25 @@ footer a { color: #fff; }
   <div class="wrap">
     <article>
       <h2>Václav Havel (1936–2011)</h2>
+      <img class="special-cover" src="img/cover-2011-special.jpg" alt="Mimořádné vydání Respektu: Václav Havel 1936–2011">
       <p>Až odezní smutek, přijde čas hledat inspiraci, psal šéfredaktor Respektu Erik Tabery pár dní po smrti Václava Havla ve Speciálu věnovaném našemu prvnímu polistopadovému prezidentovi. S výročím narození dramatika, disidenta a prezidenta Václava Havla přichází rekapitulace, co všechno pro nás jeho osobnost znamenala a čím vším nás inspiroval. „Havel se stal v roce 1989 představitelem hlavní role a režisérem hry, jež změnila dějiny,“ vyzdvihl britský politolog a historik Timothy Garton Ash. Články z tohoto Speciálu pro vás nyní odemykáme.</p>
-      <p><strong>Erik Tabery:</strong> Asi nikdy nezapomenu na to dopoledne, kdy jsme jeli s Martinem M. Šimečkou v autě a pípla mi SMS, že zemřel Václav Havel. Oba nás to zasáhlo – Martin byl navíc prezidentův blízký přítel – takže jsme pak zbytek cesty více méně mlčeli. Zpráva přišla ve chvíli, kdy čerstvě vyšlo dvojčíslo Respektu, přemýšleli jsme tedy, co udělat. Nakonec jsme se rozhodli připravit speciální vydání…</p>
-      <img class="lead-img" src="https://web.archive.org/web/20211005114353im_/https://i0.cz/s/respekt/moMe36/2016/10/img-9154_ur8d8.jpg" alt="Václav Havel">
+      <blockquote class="quote"><p>Asi nikdy nezapomenu na to dopoledne, kdy jsme jeli s Martinem M. Šimečkou v autě a pípla mi SMS, že zemřel Václav Havel. Oba nás to zasáhlo – Martin byl navíc prezidentův blízký přítel – takže jsme pak zbytek cesty více méně mlčeli. Zpráva přišla ve chvíli, kdy čerstvě vyšlo dvojčíslo Respektu, přemýšleli jsme tedy, co udělat. Nakonec jsme se rozhodli připravit speciální vydání…</p><cite>Erik Tabery</cite></blockquote>
 
       <ul class="special"><li><a href="https://www.respekt.cz/tydenik/2011/53/odkaz-vaclava-havla"><strong>Odkaz Václava Havla</strong><span class="author">Erik Tabery</span><span class=perex>Až odezní smutek, přijde čas hledat inspiraci</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/strucny-navod-jak-se-stat-nejdulezitejsi-osobnosti-sve-zeme"><strong>Stručný návod, jak se stát nejdůležitější osobností své země</strong><span class="author">Petr Třešňák, Tereza Brdečková, Marek Švehla</span><span class=perex>Před dvěma lety zemřel prezident Václav Havel</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/pravda-a-laska-atd-je-jako-slogan-moc-slozite"><strong>Pravda a láska atd. je jako slogan moc složité</strong><span class="author">Marek Švehla</span><span class=perex>Novinář, překladatel a zpěvák Plastic People Paul Wilson o dopisech, na které čekal 2 měsíce</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/reziser-hry-jez-zmenila-dejiny"><strong>Režisér hry, jež změnila dějiny</strong><span class="author">Timothy Garton Ash</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/vaclave-havle-bylo-to-skvele"><strong>Václave Havle, bylo to skvělé!</strong><span class="author">György Konrád</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/spolecnost-nevi-co-se-mnou"><strong>Společnost neví, co se mnou</strong><span class="author">Respekt</span><span class=perex>Během uplynulých dvaceti let vyšel v Respektu tucet rozhovorů s Václavem Havlem. Polovina z nich pak v době, která byla poprezidentská, a tudíž bilanční. Právě z těchto šesti interview přinášíme výběr.</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/zhaslo-srdce-na-hrade"><strong>Zhaslo srdce na Hradě</strong><span class="author">Erik Tabery, Marek Švehla</span><span class=perex>Jaké bylo prezidentství Václava Havla</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/do-posledni-chvile-prezident"><strong>Do poslední chvíle prezident</strong><span class="author">Silvie Lauder</span><span class=perex>Život Václava Havla v podhradí</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/cesta-snu"><strong>Cesta snů</strong><span class="author">Petr Třešňák</span><span class=perex>Vzpomínka na první státní návštěvu prezidenta Václava Havla v USA, která vrátila Československo na mapu svobodného světa</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/s-madeleine-v-rodine"><strong>S Madeleine v rodině</strong><span class="author">Ondřej Kundra, Silvie Lauder</span><span class=perex>Havlova globální přátelství a vřelé vztahy</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/usinali-jsme-spolecne"><strong>Usínali jsme společně</strong><span class="author">Petr Třešňák</span><span class=perex>Andrej Krob je režisér, který se svým Divadlem Na tahu inscenoval nejvíc Havlových her a patřil také k prezidentovým nejbližším přátelům. Oba sousedi z Hrádečku spolu trávili mnoho času i v posledních měsících.</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/vudce-odchazi"><strong>Vůdce odchází</strong><span class="author">Ferdinand Peroutka, 1935</span><span class=perex>Když T. G. Masaryk opouštěl prezidentský post, napsal o něm Ferdinand Peroutka pro svou Přítomnost článek, který ve většině argumentů pozoruhodně platí i na Václava Havla.</span></a></li><li><a href="https://www.respekt.cz/tydenik/2011/53/zahada-jednoho-faxu"><strong>Záhada jednoho faxu</strong><span class="author">Respekt</span></a></li></ul>
+
+      <section class="illustrations">
+        <h3>Ilustrace Pavla Reisenauera</h3>
+        <div class="carousel">
+          <button class="carousel-btn carousel-prev" type="button" aria-label="Předchozí ilustrace">‹</button>
+          <div class="strip illus"><figure><a href="img/reisenauer-2012-51.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-51.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 51/2012" loading="lazy"></a><figcaption>Respekt 51/2012</figcaption></figure><figure><a href="img/reisenauer-2014-48.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2014-48.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 48/2014" loading="lazy"></a><figcaption>Respekt 48/2014</figcaption></figure><figure><a href="img/reisenauer-2012-01.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-01.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 1/2012" loading="lazy"></a><figcaption>Respekt 1/2012</figcaption></figure><figure><a href="img/reisenauer-2013-21.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2013-21.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 21/2013" loading="lazy"></a><figcaption>Respekt 21/2013</figcaption></figure><figure><a href="img/reisenauer-2011-13.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2011-13.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 14/2011" loading="lazy"></a><figcaption>Respekt 14/2011</figcaption></figure><figure><a href="img/reisenauer-2012-01-funus.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-01-funus.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 1/2012" loading="lazy"></a><figcaption>Respekt 1/2012</figcaption></figure><figure><a href="img/reisenauer-2013-28.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2013-28.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 28/2013" loading="lazy"></a><figcaption>Respekt 28/2013</figcaption></figure><figure><a href="img/reisenauer-2012-47.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-47.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 47/2012" loading="lazy"></a><figcaption>Respekt 47/2012</figcaption></figure><figure><a href="img/reisenauer-2013-21-andel.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2013-21-andel.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 21/2013" loading="lazy"></a><figcaption>Respekt 21/2013</figcaption></figure><figure><a href="img/reisenauer-2010-19.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2010-19.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 19/2010" loading="lazy"></a><figcaption>Respekt 19/2010</figcaption></figure></div>
+          <button class="carousel-btn carousel-next" type="button" aria-label="Další ilustrace">›</button>
+        </div>
+      </section>
 
       <section class="gallery" id="foto-jaros"><h3>Rozloučení s Václavem Havlem pohledem fotografa Milana Jaroše</h3><p class="credit">Foto: Milan Jaroš</p><div class="grid"><figure><a href="img/g1-42986740_01.jpg" target="_blank" rel="noopener"><img src="img/g1-42986740_01-t.jpg" alt="Václav Havel – fotografie 1" loading="lazy"></a></figure><figure><a href="img/g1-42986770_02.jpg" target="_blank" rel="noopener"><img src="img/g1-42986770_02-t.jpg" alt="Václav Havel – fotografie 2" loading="lazy"></a></figure><figure><a href="img/g1-42986830_04.jpg" target="_blank" rel="noopener"><img src="img/g1-42986830_04-t.jpg" alt="Václav Havel – fotografie 3" loading="lazy"></a></figure><figure><a href="img/g1-42986870_05.jpg" target="_blank" rel="noopener"><img src="img/g1-42986870_05-t.jpg" alt="Václav Havel – fotografie 4" loading="lazy"></a></figure></div><details><summary>Celá fotogalerie (7 snímků)</summary><div class="grid"><figure><a href="img/g1-42986900_06.jpg" target="_blank" rel="noopener"><img src="img/g1-42986900_06-t.jpg" alt="Václav Havel – fotografie 5" loading="lazy"></a></figure><figure><a href="img/g1-42986940_07.jpg" target="_blank" rel="noopener"><img src="img/g1-42986940_07-t.jpg" alt="Václav Havel – fotografie 6" loading="lazy"></a></figure><figure><a href="img/g1-42986970_08.jpg" target="_blank" rel="noopener"><img src="img/g1-42986970_08-t.jpg" alt="Václav Havel – fotografie 7" loading="lazy"></a></figure></div></details></section>
 
       <ul class="links">
-        <li><a href="https://www.respekt.cz/tydenik/2016/39/pravda-a-laska-slavi-osmdesatku">Pravda a láska slaví osmdesátku – editorial Erika Taberyho k 80. výročí (Respekt 39/2016)</a></li>
+        <li><a href="https://www.respekt.cz/80-let-s-vaclavem-havlem">Speciál k 80. výročí</a></li>
         <li><a href="https://www.respekt.cz/tydenik/2011/53/strucny-navod-jak-se-stat-nejdulezitejsi-osobnosti-sve-zeme">Stručný návod, jak se stát nejdůležitější osobností své země</a></li>
         <li><a href="https://www.respekt.cz/tydenik/2010/13/kandidata-mam">Kandidáta mám – rozhovor s VH o tom, kdo by měl být příštím prezidentem</a></li>
         <li><a href="https://www.respekt.cz/tydenik/2012/51/rok-bez-vaclava-havla">Rok bez Václava Havla – komentář na téma, proč se autoritu VH snaží zbořit Václav Klaus</a></li>
@@ -167,10 +187,6 @@ footer a { color: #fff; }
       </ul>
     </article>
 
-    <aside>
-      <h2>Ilustrace Pavla Reisenauera</h2>
-      <div class="illus"><figure><a href="img/reisenauer-2012-51.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-51.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 51/2012" loading="lazy"></a><figcaption>Respekt 51/2012</figcaption></figure><figure><a href="img/reisenauer-2014-48.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2014-48.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 48/2014" loading="lazy"></a><figcaption>Respekt 48/2014</figcaption></figure><figure><a href="img/reisenauer-2012-01.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-01.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 1/2012" loading="lazy"></a><figcaption>Respekt 1/2012</figcaption></figure><figure><a href="img/reisenauer-2013-21.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2013-21.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 21/2013" loading="lazy"></a><figcaption>Respekt 21/2013</figcaption></figure><figure><a href="img/reisenauer-2011-13.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2011-13.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 14/2011" loading="lazy"></a><figcaption>Respekt 14/2011</figcaption></figure><figure><a href="img/reisenauer-2012-01-funus.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-01-funus.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 1/2012" loading="lazy"></a><figcaption>Respekt 1/2012</figcaption></figure><figure><a href="img/reisenauer-2013-28.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2013-28.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 28/2013" loading="lazy"></a><figcaption>Respekt 28/2013</figcaption></figure><figure><a href="img/reisenauer-2012-47.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2012-47.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 47/2012" loading="lazy"></a><figcaption>Respekt 47/2012</figcaption></figure><figure><a href="img/reisenauer-2013-21-andel.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2013-21-andel.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 21/2013" loading="lazy"></a><figcaption>Respekt 21/2013</figcaption></figure><figure><a href="img/reisenauer-2010-19.jpg" target="_blank" rel="noopener"><img src="img/reisenauer-2010-19.jpg" alt="Václav Havel – ilustrace Pavla Reisenauera, Respekt 19/2010" loading="lazy"></a><figcaption>Respekt 19/2010</figcaption></figure></div>
-    </aside>
   </div>
 </main>
 
@@ -180,10 +196,10 @@ footer a { color: #fff; }
 </footer>
 
 <script>
-(function () {
-  var strip = document.querySelector('.covers .strip');
-  var prev = document.querySelector('.carousel-prev');
-  var next = document.querySelector('.carousel-next');
+document.querySelectorAll('.carousel').forEach(function (box) {
+  var strip = box.querySelector('.strip');
+  var prev = box.querySelector('.carousel-prev');
+  var next = box.querySelector('.carousel-next');
   function step() { return strip.clientWidth * 0.8; }
   function update() {
     prev.disabled = strip.scrollLeft <= 2;
@@ -194,7 +210,7 @@ footer a { color: #fff; }
   strip.addEventListener('scroll', update, { passive: true });
   window.addEventListener('resize', update);
   update();
-})();
+});
 </script>
 
 </body>
